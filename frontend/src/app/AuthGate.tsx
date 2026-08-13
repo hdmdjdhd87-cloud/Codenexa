@@ -4,6 +4,7 @@ import { initTelegram, isInsideTelegram } from "@/lib/telegram";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
+import { ApiClientError } from "@/lib/apiClient";
 
 interface AuthGateProps {
   children: React.ReactNode;
@@ -34,8 +35,24 @@ export function AuthGate({ children }: AuthGateProps) {
 
   if (user.isLoading) return <LoadingState />;
   if (user.isError) {
-    return <ErrorState message={t("errors.authFailed")} onRetry={() => user.refetch()} />;
+    // ВРЕМЕННО (диагностика): показываем реальный код/сообщение ошибки,
+    // а не только общий текст — иначе на телефоне без консоли невозможно
+    // понять причину. Убрать detail-строку после того, как всё заработает.
+    const err = user.error;
+    const detail =
+      err instanceof ApiClientError
+        ? `[${err.code}] ${err.message} (status ${err.status})`
+        : err instanceof Error
+        ? err.message
+        : String(err);
+    return (
+      <ErrorState
+        message={`${t("errors.authFailed")}\n\n${detail}`}
+        onRetry={() => user.refetch()}
+      />
+    );
   }
 
   return <>{children}</>;
 }
+
