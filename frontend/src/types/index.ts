@@ -48,6 +48,7 @@ export interface HistoryItem {
   created_at: string;
   module_id: string | null;
   module_name: string | null;
+  module_key: string | null;
 }
 
 export interface NotificationItem {

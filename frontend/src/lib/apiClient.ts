@@ -27,16 +27,45 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 let reauthPromise: Promise<string> | null = null;
 
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 2): Promise<Response> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetch(url, init);
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 400 * (i + 1))); // короткий backoff перед повтором
+      }
+    }
+  }
+  throw lastErr;
+}
+
 async function authenticateWithTelegram(): Promise<string> {
   const initData = getInitData();
   if (!initData) {
     throw new ApiClientError(401, "NO_TELEGRAM_CONTEXT", "Приложение открыто вне Telegram — авторизация невозможна.");
   }
-  const resp = await fetch(`${API_BASE_URL}/api/v1/auth/telegram`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ init_data: initData }),
-  });
+
+  let resp: Response;
+  try {
+    resp = await fetchWithRetry(`${API_BASE_URL}/api/v1/auth/telegram`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ init_data: initData }),
+    });
+  } catch {
+    // Раньше сырая "Failed to fetch" всплывала на экран как есть (см. п.17
+    // спецификации). Теперь — понятная ошибка + один автоматический повтор
+    // уже был сделан внутри fetchWithRetry перед тем, как сдаться.
+    throw new ApiClientError(
+      0,
+      "NETWORK_ERROR",
+      "Не удалось подключиться к CodeNexa. Проверьте интернет и попробуйте снова."
+    );
+  }
+
   const body = await resp.json().catch(() => null);
   if (!resp.ok || !body?.token) {
     const err = body as ApiErrorBody | null;

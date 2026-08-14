@@ -23,7 +23,7 @@ async def list_history(user_id: str, page: int = 1) -> list[dict]:
         rows = await conn.fetch(
             """
             select h.id, h.action, h.metadata, h.created_at,
-                   h.module_id, m.name as module_name
+                   h.module_id, m.name as module_name, m.module_key as module_key
             from nexa_history h
             left join nexa_modules m on m.id = h.module_id
             where h.user_id = $1
