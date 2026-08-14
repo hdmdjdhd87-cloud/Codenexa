@@ -1,15 +1,9 @@
+import { colorFromString } from "@/lib/colorFromString";
+
 interface AvatarProps {
   photoUrl?: string | null;
   name: string;
   size?: number;
-}
-
-const PALETTE = ["#6C63FF", "#8B7CFF", "#4C7A3D", "#E8A93B", "#B5544A", "#3B82C4"];
-
-function colorForName(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
 /**
@@ -21,6 +15,7 @@ function colorForName(name: string): string {
 export function Avatar({ photoUrl, name, size = 44 }: AvatarProps) {
   const initial = (name || "?").trim().charAt(0).toUpperCase();
   const style = { width: size, height: size, fontSize: Math.round(size * 0.42) };
+  const color = colorFromString(name || "?");
 
   if (photoUrl) {
     return (
@@ -36,7 +31,7 @@ export function Avatar({ photoUrl, name, size = 44 }: AvatarProps) {
 
   return (
     <div
-      style={{ ...style, background: `${colorForName(name)}26`, color: colorForName(name) }}
+      style={{ ...style, background: color.tint, color: color.bg }}
       className="rounded-2xl flex items-center justify-center font-semibold border border-border shrink-0"
       aria-label={name}
     >
