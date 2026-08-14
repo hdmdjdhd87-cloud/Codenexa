@@ -10,6 +10,8 @@ import { NotificationsPage } from "@/features/notifications/NotificationsPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { ModuleRoutePage } from "@/features/moduleRoute/ModuleRoutePage";
+import { useSettings } from "@/hooks/useSettings";
+import { useApplyTheme } from "@/hooks/useApplyTheme";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,6 +20,9 @@ const queryClient = new QueryClient({
 });
 
 function AppShell() {
+  const settings = useSettings();
+  useApplyTheme(settings.data?.theme);
+
   return (
     <div className="min-h-screen pb-[64px]">
       <Routes>

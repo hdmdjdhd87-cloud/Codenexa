@@ -22,6 +22,25 @@
   color-scheme: dark;
 }
 
+/* Светлая тема — применяется через [data-theme="light"] на <html>,
+   переключается из Настроек (реально влияет на интерфейс, не только
+   хранится в БД). */
+:root[data-theme="light"] {
+  --cn-background: #F6F6F9;
+  --cn-surface: #FFFFFF;
+  --cn-surface-elevated: #EFEFF5;
+  --cn-border: rgba(20, 20, 30, 0.09);
+  --cn-text-primary: #16161D;
+  --cn-text-secondary: rgba(22, 22, 29, 0.56);
+  --cn-accent: #6C63FF;
+  --cn-accent-secondary: #5A4FE0;
+  --cn-success: #2E9E63;
+  --cn-warning: #C6821E;
+  --cn-error: #D1483F;
+
+  color-scheme: light;
+}
+
 html, body, #root {
   height: 100%;
 }

@@ -3,6 +3,7 @@ import t from "@/i18n";
 import { useModules } from "@/hooks/useModules";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useHistory } from "@/hooks/useHistory";
+import { useNotifications } from "@/hooks/useNotifications";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -31,6 +32,9 @@ export function HomePage() {
   const modules = useModules();
   const favorites = useFavorites();
   const history = useHistory();
+  const notifications = useNotifications();
+
+  const unreadCount = (notifications.data ?? []).filter((n) => !n.is_read).length;
 
   const displayName = user?.first_name || t("home.welcomeFallback");
   const favoriteIds = new Set((favorites.data ?? []).map((f) => f.module_id));
@@ -47,7 +51,19 @@ export function HomePage() {
           </h1>
           {user?.username && <p className="text-text-secondary text-[13px] mt-0.5">@{user.username}</p>}
         </div>
-        {user && <Avatar photoUrl={user.photo_url} name={displayName} size={48} />}
+        {user && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Link to="/notifications" aria-label={t("notifications.title")} className="relative w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center">
+              <span aria-hidden="true">🔔</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-error text-white text-[9px] font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
+            <Avatar photoUrl={user.photo_url} name={displayName} size={48} />
+          </div>
+        )}
       </div>
 
       <section className="mt-6 rounded-2xl bg-surface-elevated border border-border p-5">
