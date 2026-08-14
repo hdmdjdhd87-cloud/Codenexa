@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import t from "@/i18n";
 import { useModules } from "@/hooks/useModules";
 import { useFavorites } from "@/hooks/useFavorites";
-import { LoadingState } from "@/components/states/LoadingState";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { ModuleListSkeleton } from "@/components/states/Skeleton";
 import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ModuleCard } from "@/components/ModuleCard";
@@ -11,6 +12,7 @@ export function CatalogPage() {
   const modules = useModules();
   const favorites = useFavorites();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 250);
   const [category, setCategory] = useState<string>("all");
 
   const favoriteIds = new Set((favorites.data ?? []).map((f) => f.module_id));
@@ -26,10 +28,10 @@ export function CatalogPage() {
     return modules.data.filter((m) => {
       const matchesCategory = category === "all" || m.category === category;
       const matchesQuery =
-        query.trim() === "" || m.name.toLowerCase().includes(query.trim().toLowerCase());
+        debouncedQuery.trim() === "" || m.name.toLowerCase().includes(debouncedQuery.trim().toLowerCase());
       return matchesCategory && matchesQuery;
     });
-  }, [modules.data, category, query]);
+  }, [modules.data, category, debouncedQuery]);
 
   function toggleFavorite(moduleId: string) {
     if (favoriteIds.has(moduleId)) favorites.remove.mutate(moduleId);
@@ -72,7 +74,7 @@ export function CatalogPage() {
       )}
 
       <div className="mt-4">
-        {modules.isLoading && <LoadingState />}
+        {modules.isLoading && <ModuleListSkeleton />}
         {modules.isError && <ErrorState message={t("errors.loadModules")} onRetry={() => modules.refetch()} />}
         {modules.data && filtered.length === 0 && <EmptyState title={t("empty.modules")} />}
         {modules.data && filtered.length > 0 && (

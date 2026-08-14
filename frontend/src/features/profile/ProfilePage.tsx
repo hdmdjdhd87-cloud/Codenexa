@@ -5,7 +5,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useModules } from "@/hooks/useModules";
 import { useHistory } from "@/hooks/useHistory";
-import { LoadingState } from "@/components/states/LoadingState";
+import { ProfileHeaderSkeleton } from "@/components/states/Skeleton";
 import { ErrorState } from "@/components/states/ErrorState";
 import { Avatar } from "@/components/Avatar";
 import { clearStoredToken } from "@/lib/tokenStorage";
@@ -22,7 +22,14 @@ export function ProfilePage() {
   const history = useHistory();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
 
-  if (user.isLoading) return <LoadingState />;
+  if (user.isLoading) {
+    return (
+      <div className="px-4 pt-5 pb-6">
+        <h1 className="text-text-primary text-[20px] font-semibold mb-4">{t("profile.title")}</h1>
+        <ProfileHeaderSkeleton />
+      </div>
+    );
+  }
   if (user.isError || !user.data) {
     return <ErrorState message={t("errors.loadProfile")} onRetry={() => user.refetch()} />;
   }
@@ -80,6 +87,13 @@ export function ProfilePage() {
           Тарифы и оплата ещё не подключены — раздел показывает демонстрационные данные, чтобы место в
           интерфейсе было готово к будущей интеграции.
         </p>
+        <div className="mt-3.5 pt-3.5 border-t border-border flex flex-col gap-2">
+          <LimitBar label="Приложения" used={modules.data?.length ?? 0} total={5} />
+          <LimitBar label="Избранное" used={favorites.data?.length ?? 0} total={10} />
+        </div>
+        <p className="text-text-secondary/70 text-[11px] mt-2.5">
+          Демонстрационные лимиты Free-тарифа. Реальные ограничения появятся вместе с оплатой.
+        </p>
       </div>
 
       {/* SYSTEM */}
@@ -121,6 +135,21 @@ export function ProfilePage() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-text-secondary text-[12px] font-semibold uppercase tracking-wide mt-6 mb-2">{children}</p>;
+}
+
+function LimitBar({ label, used, total }: { label: string; used: number; total: number }) {
+  const pct = Math.min(100, Math.round((used / total) * 100));
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[11.5px] mb-1">
+        <span className="text-text-secondary">{label}</span>
+        <span className="text-text-secondary">{used} / {total}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-surface-elevated overflow-hidden">
+        <div className="h-full bg-accent rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
