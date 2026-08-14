@@ -35,22 +35,15 @@ export function AuthGate({ children }: AuthGateProps) {
 
   if (user.isLoading) return <LoadingState />;
   if (user.isError) {
-    // ВРЕМЕННО (диагностика): показываем реальный код/сообщение ошибки,
-    // а не только общий текст — иначе на телефоне без консоли невозможно
-    // понять причину. Убрать detail-строку после того, как всё заработает.
+    // Пользователю — понятное сообщение (п.27 спецификации: не техническая
+    // ошибка на экране). Технические детали — только в консоль разработчика.
     const err = user.error;
-    const detail =
-      err instanceof ApiClientError
-        ? `[${err.code}] ${err.message} (status ${err.status})`
-        : err instanceof Error
-        ? err.message
-        : String(err);
-    return (
-      <ErrorState
-        message={`${t("errors.authFailed")}\n\n${detail}`}
-        onRetry={() => user.refetch()}
-      />
-    );
+    if (err instanceof ApiClientError) {
+      console.error(`Auth failed: [${err.code}] ${err.message} (status ${err.status})`);
+    } else {
+      console.error("Auth failed:", err);
+    }
+    return <ErrorState message={t("errors.authFailed")} onRetry={() => user.refetch()} />;
   }
 
   return <>{children}</>;

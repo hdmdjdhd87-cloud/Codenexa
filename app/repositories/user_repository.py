@@ -36,7 +36,8 @@ async def get_or_create_user(tg: TelegramUser) -> dict:
                 photo_url = excluded.photo_url,
                 last_seen_at = now()
             returning id, telegram_user_id, username, first_name, last_name,
-                      language_code, photo_url, created_at, updated_at, last_seen_at
+                      language_code, photo_url, created_at, updated_at, last_seen_at,
+                      (xmax = 0) as is_new_user
             """,
             tg.telegram_user_id,
             tg.username,

@@ -14,6 +14,7 @@ from app.auth.telegram import (
 )
 from app.config import get_settings
 from app.repositories.user_repository import get_or_create_user, get_user_by_id
+from app.repositories.notification_repository import create_notification
 from app.utils.errors import api_error
 from fastapi import status
 
@@ -52,6 +53,15 @@ async def auth_telegram(payload: TelegramAuthRequest) -> AuthResponse:
         ) from exc
 
     user = await get_or_create_user(validated.user)
+    if user.pop("is_new_user", False):
+        # Единственное системное уведомление, которое реально создаётся
+        # backend-событием (не fake data) — приветствие при первом входе.
+        await create_notification(
+            user["id"],
+            "system",
+            "Добро пожаловать в CodeNexa",
+            "Все инструменты CodeNexa теперь доступны в одном месте.",
+        )
     token = create_session_token(str(user["id"]))
     return AuthResponse(token=token, user=user)
 

@@ -12,6 +12,24 @@ async def _pool_or_503():
     return pool
 
 
+async def create_notification(user_id: str, type_: str, title: str, message: str, module_id: str | None = None) -> dict:
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            insert into nexa_notifications (user_id, type, title, message, module_id)
+            values ($1, $2, $3, $4, $5)
+            returning id, type, title, message, module_id, is_read, created_at
+            """,
+            user_id,
+            type_,
+            title,
+            message,
+            module_id,
+        )
+    return dict(row)
+
+
 async def list_notifications(user_id: str) -> list[dict]:
     pool = await _pool_or_503()
     async with pool.acquire() as conn:

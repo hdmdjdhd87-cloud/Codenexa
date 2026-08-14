@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.auth.middleware import get_current_user_id
 from app.repositories.favorite_repository import add_favorite, list_favorites, remove_favorite
+from app.repositories.history_repository import add_history_event
 
 router = APIRouter(prefix="/api/v1/favorites", tags=["favorites"])
 
@@ -21,10 +22,14 @@ async def get_favorites(user_id: str = Depends(get_current_user_id)) -> list[dic
 
 @router.post("")
 async def create_favorite(payload: FavoriteRequest, user_id: str = Depends(get_current_user_id)) -> dict:
-    return await add_favorite(user_id, payload.module_id)
+    result = await add_favorite(user_id, payload.module_id)
+    await add_history_event(user_id, "favorite_add", module_id=payload.module_id)
+    return result
 
 
 @router.delete("/{module_id}")
 async def delete_favorite(module_id: str, user_id: str = Depends(get_current_user_id)) -> dict:
     await remove_favorite(user_id, module_id)
+    await add_history_event(user_id, "favorite_remove", module_id=module_id)
     return {"status": "ok"}
+
