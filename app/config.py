@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     supabase_url: str = "https://vlpgdiivliozzhacymaw.supabase.co"
     supabase_service_role_key: str = ""  # ТОЛЬКО backend, никогда не в frontend
 
+    # --- AI Docs: провайдер LLM (см. app/ai/provider.py) ---
+    # Пока не заполнены — AI Docs работает в fallback-режиме без
+    # AI-диалога (шаблоны, DOCX/PDF генерация работают и без этого).
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+
     # --- Прочее ---
     environment: str = "development"
 

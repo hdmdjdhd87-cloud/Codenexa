@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import connect, disconnect
-from app.routers import auth, favorites, health, history, modules, notifications, projects, settings as settings_router, users
+from app.routers import auth, favorites, health, history, modules, notifications, projects, settings as settings_router, users, aidocs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("codenexa")
@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications.router)
     app.include_router(settings_router.router)
     app.include_router(projects.router)
+    app.include_router(aidocs.router)
 
     return app
 

@@ -153,3 +153,36 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (resp.status === 204) return undefined as T;
   return (await resp.json()) as T;
 }
+
+/**
+ * Скачивание бинарных файлов (DOCX/PDF), которые требуют авторизации.
+ * Обычная <a href> не может передать заголовок Authorization — поэтому
+ * тут ручной fetch + blob + программный клик по временной ссылке.
+ */
+export async function downloadAuthorizedFile(path: string, filenameFallback: string): Promise<void> {
+  const token = await ensureToken();
+  const resp = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!resp.ok) {
+    const errBody = (await resp.json().catch(() => null)) as ApiErrorBody | null;
+    throw new ApiClientError(
+      resp.status,
+      errBody?.error?.code ?? "DOWNLOAD_FAILED",
+      errBody?.error?.message ?? "Не удалось скачать файл."
+    );
+  }
+  const blob = await resp.blob();
+  const disposition = resp.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match ? match[1] : filenameFallback;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

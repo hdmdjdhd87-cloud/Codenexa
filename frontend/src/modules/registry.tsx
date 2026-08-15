@@ -12,6 +12,7 @@ import { lazy } from "react";
  */
 export const MODULE_COMPONENTS: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   "codenexa-demo": lazy(() => import("./demo/DemoModulePage").then((m) => ({ default: m.DemoModulePage }))),
+  "ai-docs": lazy(() => import("./aidocs/AiDocsApp").then((m) => ({ default: m.AiDocsApp }))),
 };
 
 export function getModuleComponent(moduleKey: string) {
