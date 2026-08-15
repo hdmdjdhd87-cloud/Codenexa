@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from app.database import get_pool
 from app.utils.errors import api_error
 from fastapi import status
@@ -49,6 +47,6 @@ async def add_history_event(user_id: str, action: str, module_id: str | None = N
             user_id,
             module_id,
             action,
-            json.dumps(metadata or {}),
+            metadata or {},
         )
     return dict(row)

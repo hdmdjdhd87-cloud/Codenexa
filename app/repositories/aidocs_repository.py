@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from app.database import get_pool
 from app.utils.errors import api_error
 from fastapi import status
@@ -80,8 +78,8 @@ async def create_document(
                 template_id,
                 title,
                 doc_type,
-                json.dumps(field_values),
-                json.dumps(content_blocks),
+                field_values,
+                content_blocks,
             )
             await conn.execute(
                 """
@@ -89,7 +87,7 @@ async def create_document(
                 values ($1, 1, $2::jsonb, 'Создан документ')
                 """,
                 row["id"],
-                json.dumps(content_blocks),
+                content_blocks,
             )
     return dict(row)
 

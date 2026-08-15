@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Optional
 
@@ -17,6 +18,23 @@ from app.config import get_settings
 logger = logging.getLogger("codenexa.database")
 
 _pool: Optional[asyncpg.Pool] = None
+
+
+async def _init_connection(conn: asyncpg.Connection) -> None:
+    # КРИТИЧНО: без этого asyncpg возвращает jsonb-колонки как СЫРУЮ
+    # строку, а не распарсенный Python-объект — content_blocks/
+    # fields_schema/metadata приходили бы фронтенду строкой вместо
+    # массива/объекта, что ломало .map() на клиенте (реальный баг,
+    # найденный при первом сквозном тесте AI Docs — "чёрный экран" при
+    # открытии шаблона). Кодек регистрируется на КАЖДОЕ новое
+    # соединение пула через init=.
+    for pg_type in ("jsonb", "json"):
+        await conn.set_type_codec(
+            pg_type,
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema="pg_catalog",
+        )
 
 
 async def connect() -> None:
@@ -34,8 +52,9 @@ async def connect() -> None:
             min_size=1,
             max_size=10,
             command_timeout=10,
+            init=_init_connection,
         )
-        logger.info("Пул подключений к PostgreSQL создан")
+        logger.info("Пул подключений к PostgreSQL создан (jsonb-кодек зарегистрирован)")
     except Exception:  # noqa: BLE001 — сознательно широкий catch на старте
         logger.exception("Не удалось подключиться к PostgreSQL")
         _pool = None
