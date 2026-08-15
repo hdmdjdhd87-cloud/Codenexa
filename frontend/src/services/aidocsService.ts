@@ -53,4 +53,20 @@ export const aidocsService = {
   setFavorite: (id: string, is_favorite: boolean) =>
     apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/favorite`, { method: "PATCH", body: { is_favorite } }),
   exportUrl: (id: string, format: "docx" | "pdf") => `${API_BASE_URL}/api/v1/aidocs/documents/${id}/export/${format}`,
+  async ocr(file: File): Promise<{ text: string; structural_understanding_available: boolean }> {
+    const { getStoredToken } = await import("@/lib/tokenStorage");
+    const token = getStoredToken();
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch(`${API_BASE_URL}/api/v1/aidocs/ocr`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: form,
+    });
+    const body = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      throw new Error(body?.error?.message || "Не удалось распознать изображение.");
+    }
+    return body;
+  },
 };

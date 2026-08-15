@@ -188,10 +188,31 @@ function TemplatesView({ onSelect }: { onSelect: (t: AiDocsTemplate) => void }) 
 function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate; onCreated: (id: string) => void }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrText, setOcrText] = useState<string | null>(null);
+  const [ocrError, setOcrError] = useState<string | null>(null);
   const create = useCreateAiDoc();
 
   function setField(key: string, value: string) {
     setValues((v) => ({ ...v, [key]: value }));
+  }
+
+  async function handlePhotoUpload(file: File) {
+    setOcrError(null);
+    setOcrText(null);
+    setOcrLoading(true);
+    haptic("light");
+    try {
+      const result = await aidocsService.ocr(file);
+      setOcrText(result.text || "");
+      if (!result.text) {
+        setOcrError("Текст на изображении не распознан. Попробуйте более чёткое фото.");
+      }
+    } catch (e) {
+      setOcrError(e instanceof Error ? e.message : "Не удалось распознать изображение.");
+    } finally {
+      setOcrLoading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -215,6 +236,37 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
     <div>
       <h3 className="text-text-primary text-[16px] font-semibold mb-1">{template.name}</h3>
       <p className="text-text-secondary text-[12.5px] mb-4">Заполните данные — документ соберётся автоматически.</p>
+
+      {/* Загрузка фото/скана: настоящий OCR (Tesseract), без AI-понимания
+          структуры — честно распознаёт текст, пользователь сам переносит
+          нужное в поля ниже. */}
+      <div className="rounded-xl bg-surface border border-border p-3.5 mb-4">
+        <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-text-secondary text-[12.5px] font-medium cursor-pointer">
+          📷 Загрузить фото/скан для распознавания текста
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handlePhotoUpload(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {ocrLoading && <p className="text-text-secondary text-[12px] mt-2">Распознаём текст…</p>}
+        {ocrError && <p className="text-error text-[12px] mt-2">{ocrError}</p>}
+        {ocrText && (
+          <div className="mt-2.5">
+            <p className="text-text-secondary text-[11px] mb-1">
+              Распознанный текст (перенесите нужное в поля вручную — автоматическое понимание структуры требует AI, пока недоступно):
+            </p>
+            <div className="rounded-lg bg-surface-elevated p-2.5 text-[12px] text-text-primary whitespace-pre-wrap max-h-32 overflow-y-auto">
+              {ocrText}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-col gap-3">
         {template.fields_schema.map((field) => (

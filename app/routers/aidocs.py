@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Response, UploadFile, File
 from pydantic import BaseModel
 
 from app.auth.middleware import get_current_user_id
@@ -10,6 +10,7 @@ from app.document_engine.template_fill import fill_template, validate_required_f
 from app.document_engine.docx_renderer import render_docx
 from app.document_engine.pdf_renderer import render_pdf
 from app.document_engine.qa import DocumentQAError, check_docx, check_pdf
+from app.document_engine.ocr import OcrError, extract_text_from_image
 from app.ai.provider import ai_is_configured
 from app.utils.errors import api_error
 from fastapi import status
@@ -134,3 +135,20 @@ async def export_pdf(document_id: str, user_id: str = Depends(get_current_user_i
 
 def _safe_filename(title: str) -> str:
     return "".join(c for c in title if c.isalnum() or c in " -_").strip()[:80] or "document"
+
+
+@router.post("/ocr")
+async def ocr_image(file: UploadFile = File(...), user_id: str = Depends(get_current_user_id)) -> dict:
+    """
+    Настоящий OCR (Tesseract) — извлекает сырой текст из фото/скана.
+    НЕ понимает структуру документа (это требует AI, см. app/ai/provider.py) —
+    честно возвращает только распознанный текст.
+    """
+    data = await file.read()
+    try:
+        text = extract_text_from_image(data, content_type=file.content_type)
+    except OcrError as exc:
+        raise api_error(status.HTTP_400_BAD_REQUEST, "OCR_FAILED", str(exc)) from exc
+
+    await add_history_event(user_id, "document_ocr", metadata={"chars_extracted": len(text)})
+    return {"text": text, "structural_understanding_available": ai_is_configured()}
