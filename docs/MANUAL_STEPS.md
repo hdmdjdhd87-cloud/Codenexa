@@ -41,6 +41,7 @@ api.telegram.org, railway.app). Отмечай выполненное `[x]`, о�
   **НЕ добавлять в этот сервис** (относятся к другим/старым проектам — sports-бот, AI Sport и т.п.): `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_TELEGRAM_IDS`, `ADMIN_EMAILS`, `CACHE_TTL`, `REQUEST_DELAY_MS`, `FOOTBALLDATA_API_KEY`, `FOOTBALLDATA_BASE_URL`, `CLEARSPORTS_API_KEY`, `CLEARSPORTS_BASE_URL`.
 
 - [ ] После первого деплоя проверить `https://<backend-домен>/health` → должен вернуть `{"status":"ok"}`.
+- [ ] **НОВОЕ — ВАЖНО**: после деплоя коммита с OCR (`039b79d` и позже) проверить, что билд backend прошёл успешно и `nixpacks.toml` подтянул `tesseract-ocr`. Я не могу проверить это сам — если билд упадёт или OCR будет возвращать ошибку "tesseract is not installed" — пришли Build Logs из Railway, разберём.
 - [ ] Проверить `https://<backend-домен>/ready` → `database: true` (подтверждает, что `DATABASE_URL` рабочий).
 
 ## 3. Telegram — настройка Mini App
