@@ -52,9 +52,18 @@ async def connect() -> None:
             min_size=1,
             max_size=10,
             command_timeout=10,
+            # Railway -> Supabase Supavisor transaction pooler (порт 6543)
+            # не должен использовать asyncpg prepared-statement cache.
+            # Иначе при повторном использовании/смене backend-соединения
+            # возможны "prepared statement already exists/does not exist",
+            # после чего auth/users endpoints начинают отдавать 503.
+            statement_cache_size=0,
             init=_init_connection,
         )
-        logger.info("Пул подключений к PostgreSQL создан (jsonb-кодек зарегистрирован)")
+        logger.info(
+            "Пул подключений к PostgreSQL создан "
+            "(jsonb-кодек зарегистрирован, statement cache отключён)"
+        )
     except Exception:  # noqa: BLE001 — сознательно широкий catch на старте
         logger.exception("Не удалось подключиться к PostgreSQL")
         _pool = None
