@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(settings_router.router)
     app.include_router(projects.router)
     app.include_router(aidocs.router)
+    app.include_router(aidocs.public_router)
 
     return app
 

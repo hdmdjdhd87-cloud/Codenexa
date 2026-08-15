@@ -39,12 +39,21 @@ export interface AiDocsVersion {
   created_at: string;
 }
 
+export interface AiDocsShare {
+  id: string;
+  token: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export const aidocsService = {
   status: () => apiRequest<{ ai_available: boolean }>("/api/v1/aidocs/status"),
   templates: () => apiRequest<AiDocsTemplate[]>("/api/v1/aidocs/templates"),
-  documents: () => apiRequest<AiDocsDocument[]>("/api/v1/aidocs/documents"),
+  documents: (search?: string) =>
+    apiRequest<AiDocsDocument[]>(`/api/v1/aidocs/documents${search ? `?search=${encodeURIComponent(search)}` : ""}`),
   document: (id: string) => apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}`),
   versions: (id: string) => apiRequest<AiDocsVersion[]>(`/api/v1/aidocs/documents/${id}/versions`),
   create: (payload: { template_id: string; title: string; field_values: Record<string, string> }) =>
@@ -52,6 +61,14 @@ export const aidocsService = {
   remove: (id: string) => apiRequest<{ status: string }>(`/api/v1/aidocs/documents/${id}`, { method: "DELETE" }),
   setFavorite: (id: string, is_favorite: boolean) =>
     apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/favorite`, { method: "PATCH", body: { is_favorite } }),
+  rename: (id: string, title: string) =>
+    apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/rename`, { method: "PATCH", body: { title } }),
+  duplicate: (id: string) => apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/duplicate`, { method: "POST" }),
+  createShare: (id: string, expires_in_days: number | null) =>
+    apiRequest<AiDocsShare>(`/api/v1/aidocs/documents/${id}/share`, { method: "POST", body: { expires_in_days } }),
+  listShares: (id: string) => apiRequest<AiDocsShare[]>(`/api/v1/aidocs/documents/${id}/shares`),
+  revokeShare: (shareId: string) => apiRequest<{ status: string }>(`/api/v1/aidocs/shares/${shareId}`, { method: "DELETE" }),
+  shareUrl: (token: string) => `${API_BASE_URL}/api/v1/aidocs/shared/${token}`,
   exportUrl: (id: string, format: "docx" | "pdf") => `${API_BASE_URL}/api/v1/aidocs/documents/${id}/export/${format}`,
   async ocr(file: File): Promise<{ text: string; structural_understanding_available: boolean }> {
     const { getStoredToken } = await import("@/lib/tokenStorage");

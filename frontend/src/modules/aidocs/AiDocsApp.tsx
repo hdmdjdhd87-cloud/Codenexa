@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { hideBackButton, showBackButton, haptic } from "@/lib/telegram";
 import { downloadAuthorizedFile } from "@/lib/apiClient";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { aidocsService, type AiDocsTemplate } from "@/services/aidocsService";
 import {
   useAiStatus,
@@ -12,6 +13,8 @@ import {
   useCreateAiDoc,
   useDeleteAiDoc,
   useToggleAiDocFavorite,
+  useRenameAiDoc,
+  useDuplicateAiDoc,
 } from "./hooks";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
@@ -99,7 +102,9 @@ export function AiDocsApp() {
 /* ============================= LIST ============================= */
 
 function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void; onOpen: (id: string) => void }) {
-  const documents = useAiDocsDocuments();
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 250);
+  const documents = useAiDocsDocuments(debouncedQuery);
 
   return (
     <div>
@@ -108,17 +113,27 @@ function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void
           haptic("light");
           onCreateClick();
         }}
-        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] mb-5"
+        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] mb-4"
       >
         + Создать документ
       </button>
+
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Поиск по названию или тексту"
+        className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-secondary outline-none focus:border-accent mb-4"
+      />
 
       <h3 className="text-text-primary text-[14px] font-semibold mb-2.5">Мои документы</h3>
 
       {documents.isLoading && <ModuleListSkeleton count={3} />}
       {documents.isError && <ErrorState message="Не удалось загрузить документы." onRetry={() => documents.refetch()} />}
       {documents.data && documents.data.length === 0 && (
-        <EmptyState title="Здесь пока ничего нет" description="Создайте первый документ по шаблону выше." />
+        <EmptyState
+          title={query ? "Ничего не найдено" : "Здесь пока ничего нет"}
+          description={query ? "Попробуйте другой запрос." : "Создайте первый документ по шаблону выше."}
+        />
       )}
       {documents.data && documents.data.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -314,9 +329,38 @@ function DocumentPreviewView({ documentId, onDeleted }: { documentId: string; on
   const versions = useAiDocsVersions(documentId);
   const del = useDeleteAiDoc();
   const toggleFav = useToggleAiDocFavorite();
+  const rename = useRenameAiDoc();
+  const duplicate = useDuplicateAiDoc();
   const [downloading, setDownloading] = useState<"docx" | "pdf" | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
+
+  async function handleShare(expiresInDays: number | null) {
+    setShareError(null);
+    setShareLoading(true);
+    haptic("light");
+    try {
+      const share = await aidocsService.createShare(documentId, expiresInDays);
+      setShareLink(aidocsService.shareUrl(share.token));
+    } catch (e) {
+      setShareError(e instanceof Error ? e.message : "Не удалось создать ссылку.");
+    } finally {
+      setShareLoading(false);
+    }
+  }
+
+  async function handleDuplicate() {
+    haptic("light");
+    const copy = await duplicate.mutateAsync(documentId);
+    setDuplicateNotice(`Создана копия: «${copy.title}» — она в списке «Мои документы».`);
+  }
 
   async function handleExport(format: "docx" | "pdf") {
     setDownloadError(null);
@@ -343,8 +387,30 @@ function DocumentPreviewView({ documentId, onDeleted }: { documentId: string; on
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <h3 className="text-text-primary text-[17px] font-semibold min-w-0 truncate">{d.title}</h3>
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        {!renaming ? (
+          <h3
+            onClick={() => {
+              setRenameValue(d.title);
+              setRenaming(true);
+            }}
+            className="text-text-primary text-[17px] font-semibold min-w-0 truncate cursor-pointer"
+          >
+            {d.title}
+          </h3>
+        ) : (
+          <input
+            autoFocus
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onBlur={() => {
+              if (renameValue.trim() && renameValue !== d.title) rename.mutate({ id: documentId, title: renameValue.trim() });
+              setRenaming(false);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+            className="min-w-0 flex-1 bg-transparent border-b border-accent text-text-primary text-[17px] font-semibold outline-none"
+          />
+        )}
         <button
           onClick={() => toggleFav.mutate({ id: documentId, is_favorite: !d.is_favorite })}
           className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[16px] ${
@@ -354,6 +420,7 @@ function DocumentPreviewView({ documentId, onDeleted }: { documentId: string; on
           {d.is_favorite ? "★" : "☆"}
         </button>
       </div>
+      <p className="text-text-secondary text-[11px] mb-4">Нажмите на название, чтобы переименовать</p>
 
       {/* "Лист документа" — предпросмотр как страница, не просто список текста */}
       <div className="rounded-2xl bg-white text-black p-5 shadow-inner" style={{ fontFamily: "Georgia, serif" }}>
@@ -406,6 +473,66 @@ function DocumentPreviewView({ documentId, onDeleted }: { documentId: string; on
           {downloading === "pdf" ? "Готовим…" : "Скачать PDF"}
         </button>
       </div>
+
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <button
+          onClick={handleDuplicate}
+          disabled={duplicate.isPending}
+          className="py-2.5 rounded-xl bg-surface border border-border text-text-primary text-[12.5px] font-semibold disabled:opacity-60"
+        >
+          {duplicate.isPending ? "Копируем…" : "Создать копию"}
+        </button>
+        <button
+          onClick={() => setShareOpen((v) => !v)}
+          className="py-2.5 rounded-xl bg-surface border border-border text-text-primary text-[12.5px] font-semibold"
+        >
+          Поделиться
+        </button>
+      </div>
+      {duplicateNotice && <p className="text-success text-[12px] mt-2">{duplicateNotice}</p>}
+
+      {shareOpen && (
+        <div className="rounded-xl bg-surface border border-border p-3.5 mt-2">
+          {!shareLink ? (
+            <>
+              <p className="text-text-secondary text-[12px] mb-2.5">
+                Создаётся view-only ссылка — по ней документ можно только посмотреть, без авторизации.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleShare(7)}
+                  disabled={shareLoading}
+                  className="flex-1 py-2 rounded-lg bg-accent text-white text-[12.5px] font-semibold disabled:opacity-60"
+                >
+                  {shareLoading ? "Создаём…" : "На 7 дней"}
+                </button>
+                <button
+                  onClick={() => handleShare(null)}
+                  disabled={shareLoading}
+                  className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold disabled:opacity-60"
+                >
+                  Бессрочно
+                </button>
+              </div>
+              {shareError && <p className="text-error text-[12px] mt-2">{shareError}</p>}
+            </>
+          ) : (
+            <>
+              <p className="text-text-secondary text-[11.5px] mb-1.5">Ссылка готова:</p>
+              <div className="rounded-lg bg-surface-elevated p-2.5 text-[11.5px] text-accent break-all">{shareLink}</div>
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(shareLink);
+                  haptic("success");
+                }}
+                className="w-full mt-2 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold"
+              >
+                Скопировать
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {versions.data && versions.data.length > 0 && (
         <div className="mt-5">

@@ -9,8 +9,11 @@ export function useAiDocsTemplates() {
   return useQuery({ queryKey: ["aidocs", "templates"], queryFn: aidocsService.templates });
 }
 
-export function useAiDocsDocuments() {
-  return useQuery({ queryKey: ["aidocs", "documents"], queryFn: aidocsService.documents });
+export function useAiDocsDocuments(search?: string) {
+  return useQuery({
+    queryKey: ["aidocs", "documents", search ?? ""],
+    queryFn: () => aidocsService.documents(search),
+  });
 }
 
 export function useAiDocsDocument(id: string | null) {
@@ -49,6 +52,25 @@ export function useToggleAiDocFavorite() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, is_favorite }: { id: string; is_favorite: boolean }) => aidocsService.setFavorite(id, is_favorite),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["aidocs", "documents"] }),
+  });
+}
+
+export function useRenameAiDoc() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => aidocsService.rename(id, title),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["aidocs", "documents"] });
+      qc.invalidateQueries({ queryKey: ["aidocs", "document", vars.id] });
+    },
+  });
+}
+
+export function useDuplicateAiDoc() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: aidocsService.duplicate,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["aidocs", "documents"] }),
   });
 }
