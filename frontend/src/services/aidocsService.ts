@@ -86,4 +86,21 @@ export const aidocsService = {
     }
     return body;
   },
+  importDocument: async (file: File, title?: string): Promise<AiDocsDocument> => {
+    const { getStoredToken } = await import("@/lib/tokenStorage");
+    const token = getStoredToken();
+    const form = new FormData();
+    form.append("file", file);
+    if (title) form.append("title", title);
+    const resp = await fetch(`${API_BASE_URL}/api/v1/aidocs/documents/import`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: form,
+    });
+    const body = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      throw new Error(body?.error?.message || "Не удалось импортировать документ.");
+    }
+    return body;
+  },
 };

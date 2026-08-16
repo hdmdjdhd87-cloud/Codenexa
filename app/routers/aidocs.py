@@ -11,6 +11,11 @@ from app.document_engine.docx_renderer import render_docx
 from app.document_engine.pdf_renderer import render_pdf
 from app.document_engine.qa import DocumentQAError, check_docx, check_pdf
 from app.document_engine.ocr import OcrError, extract_text_from_image
+from app.document_engine.import_reader import (
+    ImportError_,
+    extract_text_from_docx_file,
+    extract_text_from_pdf_file,
+)
 from app.ai.provider import ai_is_configured
 from app.utils.errors import api_error
 from fastapi import status
@@ -213,4 +218,40 @@ async def get_shared_document(token: str) -> dict:
     doc = await repo.get_document_by_share_token(token)
     if not doc:
         raise api_error(status.HTTP_404_NOT_FOUND, "SHARE_NOT_FOUND_OR_EXPIRED", "Ссылка недействительна или истекла.")
+    return doc
+
+
+@router.post("/documents/import")
+async def import_document(
+    file: UploadFile = File(...),
+    title: str | None = None,
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
+    """
+    Создаёт документ из загруженного DOCX/PDF. ЧЕСТНО: только реальное
+    извлечение текста (python-docx/pypdf) — без AI-понимания структуры,
+    без AI-улучшений (см. app/ai/provider.py, недоступно без ключа).
+    """
+    data = await file.read()
+    filename = (file.filename or "").lower()
+
+    try:
+        if filename.endswith(".docx"):
+            paragraphs = extract_text_from_docx_file(data)
+        elif filename.endswith(".pdf"):
+            paragraphs = extract_text_from_pdf_file(data)
+        else:
+            raise api_error(
+                status.HTTP_400_BAD_REQUEST, "UNSUPPORTED_FORMAT", "Поддерживаются только файлы .docx и .pdf."
+            )
+    except ImportError_ as exc:
+        raise api_error(status.HTTP_400_BAD_REQUEST, "IMPORT_FAILED", str(exc)) from exc
+
+    content_blocks = [{"type": "paragraph", "text": p} for p in paragraphs]
+    doc_title = (title or file.filename or "Импортированный документ").strip()
+
+    doc = await repo.create_document(user_id, None, doc_title, "universal", {}, content_blocks)
+    await add_history_event(
+        user_id, "document_import", metadata={"document_id": str(doc["id"]), "source_filename": file.filename}
+    )
     return doc

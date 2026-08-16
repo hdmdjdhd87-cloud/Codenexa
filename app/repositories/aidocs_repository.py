@@ -84,7 +84,7 @@ async def get_document(user_id: str, document_id: str) -> dict | None:
 
 
 async def create_document(
-    user_id: str, template_id: str, title: str, doc_type: str, field_values: dict, content_blocks: list[dict]
+    user_id: str, template_id: str | None, title: str, doc_type: str, field_values: dict, content_blocks: list[dict]
 ) -> dict:
     pool = await _pool_or_503()
     async with pool.acquire() as conn:

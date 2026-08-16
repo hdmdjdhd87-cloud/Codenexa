@@ -105,6 +105,24 @@ function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 250);
   const documents = useAiDocsDocuments(debouncedQuery);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  async function handleImport(file: File) {
+    setImportError(null);
+    setImporting(true);
+    haptic("light");
+    try {
+      const doc = await aidocsService.importDocument(file);
+      haptic("success");
+      onOpen(doc.id);
+    } catch (e) {
+      haptic("error");
+      setImportError(e instanceof Error ? e.message : "Не удалось импортировать документ.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   return (
     <div>
@@ -113,10 +131,26 @@ function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void
           haptic("light");
           onCreateClick();
         }}
-        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] mb-4"
+        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] mb-2.5"
       >
         + Создать документ
       </button>
+
+      <label className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-surface border border-border text-text-primary text-[13px] font-semibold mb-4 cursor-pointer">
+        {importing ? "Импортируем…" : "📄 Загрузить документ (DOCX/PDF)"}
+        <input
+          type="file"
+          accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="hidden"
+          disabled={importing}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImport(file);
+            e.target.value = "";
+          }}
+        />
+      </label>
+      {importError && <p className="text-error text-[12px] -mt-2 mb-3">{importError}</p>}
 
       <input
         value={query}
