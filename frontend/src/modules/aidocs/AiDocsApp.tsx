@@ -21,7 +21,7 @@ import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ModuleListSkeleton } from "@/components/states/Skeleton";
 
-type View = "list" | "templates" | "create" | "preview";
+type View = "home" | "list" | "templates" | "create" | "preview";
 
 const CATEGORY_LABELS: Record<string, string> = {
   business: "Деловые",
@@ -34,21 +34,34 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function filteredDocuments<T extends { is_favorite: boolean; updated_at: string }>(
+  docs: T[],
+  filter: "all" | "favorites" | "recent"
+): T[] {
+  if (filter === "favorites") return docs.filter((d) => d.is_favorite);
+  if (filter === "recent") {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return docs.filter((d) => new Date(d.updated_at).getTime() >= weekAgo);
+  }
+  return docs;
+}
+
 export function AiDocsApp() {
   const navigate = useNavigate();
-  const [view, setView] = useState<View>("list");
+  const [view, setView] = useState<View>("home");
   const [selectedTemplate, setSelectedTemplate] = useState<AiDocsTemplate | null>(null);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
 
   const status = useAiStatus();
 
-  // Telegram BackButton: внутри модуля сначала возвращаемся на список,
-  // и только с самого списка — обратно в каталог CodeNexa.
+  // Telegram BackButton: внутри модуля сначала возвращаемся на предыдущий
+  // экран, и только с самой Главной AI Docs — обратно в каталог CodeNexa.
   useEffect(() => {
     const onBack = () => {
       if (view === "create") setView("templates");
       else if (view === "preview") setView("list");
-      else if (view === "templates") setView("list");
+      else if (view === "templates") setView("home");
+      else if (view === "list") setView("home");
       else navigate("/catalog");
     };
     showBackButton(onBack);
@@ -66,6 +79,16 @@ export function AiDocsApp() {
         )}
       </div>
 
+      {view === "home" && (
+        <AiDocsHomeView
+          onOpenList={() => setView("list")}
+          onOpenTemplates={() => setView("templates")}
+          onOpen={(id) => {
+            setActiveDocId(id);
+            setView("preview");
+          }}
+        />
+      )}
       {view === "list" && (
         <DocumentListView
           onCreateClick={() => setView("templates")}
@@ -99,6 +122,80 @@ export function AiDocsApp() {
   );
 }
 
+/* ============================= HOME ============================= */
+
+function AiDocsHomeView({
+  onOpenList,
+  onOpenTemplates,
+  onOpen,
+}: {
+  onOpenList: () => void;
+  onOpenTemplates: () => void;
+  onOpen: (id: string) => void;
+}) {
+  const documents = useAiDocsDocuments();
+
+  const total = documents.data?.length ?? 0;
+  const favoritesCount = (documents.data ?? []).filter((d) => d.is_favorite).length;
+  const lastDoc = (documents.data ?? [])[0]; // список уже отсортирован backend'ом по updated_at desc
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          haptic("light");
+          onOpenTemplates();
+        }}
+        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] mb-4"
+      >
+        + Создать документ
+      </button>
+
+      <div className="grid grid-cols-3 gap-2 mb-5">
+        <StatCard label="Документов" value={total} />
+        <StatCard label="Избранных" value={favoritesCount} />
+        <StatCard label="Шаблонов" value={4} />
+      </div>
+
+      {lastDoc && (
+        <div className="mb-5">
+          <p className="text-text-secondary text-[12px] font-semibold uppercase tracking-wide mb-2">
+            Последний документ
+          </p>
+          <button
+            onClick={() => onOpen(lastDoc.id)}
+            className="w-full text-left rounded-2xl bg-surface border border-border p-4 flex items-center justify-between"
+          >
+            <div className="min-w-0">
+              <p className="text-text-primary font-semibold text-[14px] truncate">{lastDoc.title}</p>
+              <p className="text-text-secondary text-[12px] mt-0.5">{formatDate(lastDoc.updated_at)}</p>
+            </div>
+            <span className="text-text-secondary/40 text-[16px] shrink-0">›</span>
+          </button>
+        </div>
+      )}
+
+      <button
+        onClick={onOpenList}
+        className="w-full py-3 rounded-2xl bg-surface border border-border text-text-primary text-[13.5px] font-semibold"
+      >
+        Все документы {total > 0 ? `(${total})` : ""}
+      </button>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl bg-surface border border-border p-3 text-center">
+      <p className="text-text-primary text-[20px] font-semibold" style={{ fontFamily: "inherit" }}>
+        {value}
+      </p>
+      <p className="text-text-secondary text-[10.5px] mt-0.5">{label}</p>
+    </div>
+  );
+}
+
 /* ============================= LIST ============================= */
 
 function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void; onOpen: (id: string) => void }) {
@@ -107,6 +204,7 @@ function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void
   const documents = useAiDocsDocuments(debouncedQuery);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "favorites" | "recent">("all");
 
   async function handleImport(file: File) {
     setImportError(null);
@@ -161,17 +259,31 @@ function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void
 
       <h3 className="text-text-primary text-[14px] font-semibold mb-2.5">Мои документы</h3>
 
+      <div className="flex gap-1.5 mb-3">
+        {(["all", "recent", "favorites"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1.5 rounded-full text-[12px] font-semibold ${
+              filter === f ? "bg-accent text-white" : "bg-surface border border-border text-text-secondary"
+            }`}
+          >
+            {f === "all" ? "Все" : f === "recent" ? "Недавние" : "Избранные"}
+          </button>
+        ))}
+      </div>
+
       {documents.isLoading && <ModuleListSkeleton count={3} />}
       {documents.isError && <ErrorState message="Не удалось загрузить документы." onRetry={() => documents.refetch()} />}
-      {documents.data && documents.data.length === 0 && (
+      {documents.data && filteredDocuments(documents.data, filter).length === 0 && (
         <EmptyState
           title={query ? "Ничего не найдено" : "Здесь пока ничего нет"}
           description={query ? "Попробуйте другой запрос." : "Создайте первый документ по шаблону выше."}
         />
       )}
-      {documents.data && documents.data.length > 0 && (
+      {documents.data && filteredDocuments(documents.data, filter).length > 0 && (
         <div className="flex flex-col gap-2">
-          {documents.data.map((doc) => (
+          {filteredDocuments(documents.data, filter).map((doc) => (
             <button
               key={doc.id}
               onClick={() => onOpen(doc.id)}
