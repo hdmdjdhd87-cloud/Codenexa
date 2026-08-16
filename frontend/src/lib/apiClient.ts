@@ -27,15 +27,23 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 let reauthPromise: Promise<string> | null = null;
 
-async function fetchWithRetry(url: string, init: RequestInit, attempts = 2): Promise<Response> {
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await fetch(url, init);
+      const resp = await fetch(url, init);
+      // 5xx часто означает временную проблему на сервере (холодный старт
+      // контейнера, кратковременная недоступность БД) — тоже стоит
+      // повторить, а не сразу сдаваться после первого же ответа.
+      if (resp.status >= 500 && i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+        continue;
+      }
+      return resp;
     } catch (err) {
       lastErr = err;
       if (i < attempts - 1) {
-        await new Promise((r) => setTimeout(r, 400 * (i + 1))); // короткий backoff перед повтором
+        await new Promise((r) => setTimeout(r, 500 * (i + 1))); // короткий backoff перед повтором
       }
     }
   }
