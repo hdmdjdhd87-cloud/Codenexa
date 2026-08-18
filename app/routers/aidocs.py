@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, UploadFile, File, Query
+from fastapi import APIRouter, Depends, Response, UploadFile, File, Query, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.auth.middleware import get_current_user_id
@@ -17,6 +18,9 @@ from app.document_engine.import_reader import (
     extract_text_from_pdf_file,
 )
 from app.ai.provider import ai_is_configured
+from app.repositories import conversation_repository as conv_repo
+from app.document_intelligence.agent import DocumentAgent, ConversationState
+from app.document_intelligence.analyzer import analyze_document
 from app.utils.errors import api_error
 from fastapi import status
 
@@ -212,13 +216,147 @@ async def revoke_share(share_id: str, user_id: str = Depends(get_current_user_id
 
 
 @public_router.get("/{token}")
-async def get_shared_document(token: str) -> dict:
-    """Публичный view-only доступ по ссылке — без авторизации, но
-    только если ссылка не отозвана и не истекла (проверяется в БД)."""
-    doc = await repo.get_document_by_share_token(token)
+async def get_shared_document(token: str) -> Response:
+    """
+    Публичный mobile-first просмотр документа (п.18/49 промпта).
+    Раньше отдавал сырой JSON — исправлено: настоящая HTML-страница,
+    без авторизации, без React-бандла (лёгкая, п.43), с честными
+    состояниями revoked/expired/not_found вместо общего "недоступен".
+    """
+    try:
+        link_status = await repo.get_share_link_status(token)
+    except HTTPException:
+        # БД временно недоступна — даже в этом случае пользователь не
+        # должен увидеть сырой JSON/stack trace (п.18/49 промпта).
+        return HTMLResponse(_shared_state_page("Не удалось загрузить документ. Попробуйте открыть ссылку позже."), status_code=503)
+
+    if link_status == "expired":
+        return HTMLResponse(_shared_state_page("Срок действия ссылки истёк."), status_code=410)
+    if link_status == "revoked":
+        return HTMLResponse(_shared_state_page("Ссылка была отозвана владельцем."), status_code=410)
+    if link_status == "not_found":
+        return HTMLResponse(_shared_state_page("Документ недоступен."), status_code=404)
+
+    try:
+        doc = await repo.get_document_by_share_token(token)
+    except HTTPException:
+        return HTMLResponse(_shared_state_page("Не удалось загрузить документ. Попробуйте открыть ссылку позже."), status_code=503)
+
     if not doc:
-        raise api_error(status.HTTP_404_NOT_FOUND, "SHARE_NOT_FOUND_OR_EXPIRED", "Ссылка недействительна или истекла.")
-    return doc
+        # Гонка между проверкой статуса и получением документа (например,
+        # ссылку отозвали между двумя запросами) — тот же честный экран.
+        return HTMLResponse(_shared_state_page("Документ недоступен."), status_code=404)
+
+    return HTMLResponse(_shared_document_page(doc, token))
+
+
+@public_router.get("/{token}/download/{fmt}")
+async def download_shared_document(token: str, fmt: str) -> Response:
+    if fmt not in ("docx", "pdf"):
+        return HTMLResponse(_shared_state_page("Неподдерживаемый формат."), status_code=400)
+
+    try:
+        doc = await repo.get_document_by_share_token(token)
+    except HTTPException:
+        return HTMLResponse(_shared_state_page("Не удалось загрузить документ. Попробуйте открыть ссылку позже."), status_code=503)
+
+    if not doc:
+        return HTMLResponse(_shared_state_page("Документ недоступен."), status_code=404)
+
+    if fmt == "docx":
+        data = render_docx(doc["title"], doc["content_blocks"])
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    else:
+        data = render_pdf(doc["title"], doc["content_blocks"])
+        media_type = "application/pdf"
+
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{_safe_filename(doc["title"])}.{fmt}"'},
+    )
+
+
+def _shared_state_page(message: str) -> str:
+    return f"""<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>AI Docs</title>
+<style>{_SHARED_CSS}</style></head>
+<body><div class="wrap"><div class="card state-card">
+<p class="brand">AI Docs</p>
+<p class="state-message">{message}</p>
+</div></div></body></html>"""
+
+
+def _shared_document_page(doc: dict, token: str) -> str:
+    date_str = doc["created_at"].strftime("%d.%m.%Y") if hasattr(doc["created_at"], "strftime") else str(doc["created_at"])[:10]
+    blocks_html = ""
+    for block in doc.get("content_blocks") or []:
+        block_type = block.get("type")
+        text = _html_escape(block.get("text", ""))
+        if block_type == "spacer":
+            blocks_html += '<div class="spacer"></div>'
+        elif block_type == "heading_center":
+            blocks_html += f'<p class="h-center">{text}</p>'
+        elif block_type == "heading":
+            blocks_html += f'<p class="h">{text}</p>'
+        elif block_type == "paragraph_right":
+            blocks_html += f'<p class="p-right">{text}</p>'
+        elif block_type == "signature_line":
+            blocks_html += f'<p class="signature">{text} &nbsp;&nbsp; _______________</p>'
+        else:
+            blocks_html += f'<p class="p">{text}</p>'
+
+    return f"""<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{_html_escape(doc["title"])} — AI Docs</title>
+<style>{_SHARED_CSS}</style></head>
+<body><div class="wrap">
+<p class="brand">AI Docs</p>
+<div class="card doc-card">
+  <h1 class="doc-title">{_html_escape(doc["title"])}</h1>
+  <p class="doc-date">{date_str}</p>
+  <div class="divider"></div>
+  <div class="doc-body">{blocks_html}</div>
+</div>
+<div class="actions">
+  <a class="btn" href="/api/v1/aidocs/shared/{token}/download/pdf">Скачать PDF</a>
+  <a class="btn btn-outline" href="/api/v1/aidocs/shared/{token}/download/docx">Скачать DOCX</a>
+</div>
+</div></body></html>"""
+
+
+def _html_escape(text: str) -> str:
+    return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+_SHARED_CSS = """
+:root{color-scheme:dark;}
+*{box-sizing:border-box;}
+body{margin:0;background:#0B0B10;color:#F5F5F7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:480px;margin:0 auto;padding:24px 16px 40px;min-height:100vh;}
+.brand{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6C63FF;text-align:center;margin:0 0 18px;}
+.card{background:#131319;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:20px;}
+.state-card{margin-top:20vh;text-align:center;padding:32px 20px;}
+.state-message{font-size:15px;color:rgba(245,245,247,.75);margin:8px 0 0;}
+.doc-title{font-size:19px;font-weight:700;margin:0;text-align:center;}
+.doc-date{font-size:12px;color:rgba(245,245,247,.5);text-align:center;margin:4px 0 0;}
+.divider{height:1px;background:rgba(255,255,255,.08);margin:16px 0;}
+.doc-body{background:#fff;color:#161616;border-radius:14px;padding:20px;font-family:Georgia,serif;}
+.doc-body .p{font-size:13px;line-height:1.6;text-align:justify;margin:6px 0;}
+.doc-body .p-right{font-size:12.5px;text-align:right;margin:4px 0;}
+.doc-body .h{font-weight:700;font-size:13.5px;margin:14px 0 4px;}
+.doc-body .h-center{font-weight:700;font-size:14.5px;text-align:center;margin:6px 0;}
+.doc-body .signature{font-size:12.5px;margin-top:16px;}
+.doc-body .spacer{height:12px;}
+.actions{display:flex;gap:8px;margin-top:16px;}
+.btn{flex:1;text-align:center;padding:13px;border-radius:14px;background:#6C63FF;color:#fff;text-decoration:none;font-weight:700;font-size:13.5px;}
+.btn-outline{background:#131319;border:1px solid rgba(255,255,255,.14);color:#F5F5F7;}
+"""
 
 
 @router.post("/documents/import")
@@ -255,3 +393,106 @@ async def import_document(
         user_id, "document_import", metadata={"document_id": str(doc["id"]), "source_filename": file.filename}
     )
     return doc
+
+
+class ChatRequest(BaseModel):
+    message: str
+    conversation_id: str | None = None
+
+
+@router.post("/chat")
+async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)) -> dict:
+    """
+    Document Intelligence Engine — rule-based (regex/scoring), БЕЗ
+    внешнего AI API (см. app/document_intelligence/). Живой диалог,
+    но интеллект — сопоставление с образцом, не понимание языка.
+    """
+    if payload.conversation_id:
+        conv = await conv_repo.get_conversation(user_id, payload.conversation_id)
+        if not conv:
+            raise api_error(status.HTTP_404_NOT_FOUND, "CONVERSATION_NOT_FOUND", "Диалог не найден.")
+    else:
+        conv = await conv_repo.get_or_create_active_conversation(user_id)
+
+    templates = await repo.list_templates_full()
+    templates_by_key = {t["template_key"]: t for t in templates}
+
+    agent = DocumentAgent(lambda key: templates_by_key.get(key), None)
+    state = ConversationState(
+        status=conv["status"],
+        intent=conv["intent"],
+        template_key=conv["template_key"],
+        field_values=dict(conv["field_values"] or {}),
+        awaiting_field=conv["awaiting_field"],
+    )
+
+    reply = agent.handle_message(state, payload.message)
+
+    messages = list(conv["messages"] or [])
+    messages.append({"role": "user", "text": payload.message, "created_at": conv_repo.now_iso()})
+    messages.append({"role": "agent", "text": reply.message, "created_at": conv_repo.now_iso()})
+
+    created_document = None
+    if reply.ready_to_create and state.status == "done" and state.template_key:
+        template = templates_by_key.get(state.template_key)
+        if template:
+            content_blocks = fill_template(template["body_template"], state.field_values)
+            created_document = await repo.create_document(
+                user_id, template["id"], template["name"], template["category"], state.field_values, content_blocks
+            )
+            await add_history_event(
+                user_id, "document_create_via_chat",
+                metadata={"document_id": str(created_document["id"]), "template_key": state.template_key},
+            )
+
+    updated_conv = await conv_repo.save_conversation_state(
+        conv["id"],
+        state.status,
+        state.intent,
+        state.template_key,
+        state.field_values,
+        state.awaiting_field,
+        messages,
+        document_id=str(created_document["id"]) if created_document else None,
+    )
+
+    return {
+        "conversation_id": str(updated_conv["id"]),
+        "reply": reply.message,
+        "status": state.status,
+        "quick_actions": reply.quick_actions,
+        "ready_to_create": reply.ready_to_create,
+        "document": created_document,
+    }
+
+
+@router.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str, user_id: str = Depends(get_current_user_id)) -> dict:
+    conv = await conv_repo.get_conversation(user_id, conversation_id)
+    if not conv:
+        raise api_error(status.HTTP_404_NOT_FOUND, "CONVERSATION_NOT_FOUND", "Диалог не найден.")
+    return conv
+
+
+@router.get("/conversations/active/current")
+async def get_active_conversation(user_id: str = Depends(get_current_user_id)) -> dict:
+    """Для восстановления состояния после закрытия Mini App (п.25/26 промпта — autosave/conversation state)."""
+    return await conv_repo.get_or_create_active_conversation(user_id)
+
+
+@router.post("/documents/{document_id}/analyze")
+async def analyze_document_route(document_id: str, user_id: str = Depends(get_current_user_id)) -> dict:
+    """Document Quality Check — rule-based (п.21-22 промпта), не юридический AI-анализ."""
+    doc = await repo.get_document(user_id, document_id)
+    if not doc:
+        raise api_error(status.HTTP_404_NOT_FOUND, "DOCUMENT_NOT_FOUND", "Документ не найден.")
+    report = analyze_document(doc["content_blocks"])
+    await add_history_event(user_id, "document_analyze", metadata={"document_id": document_id, "status": report.status})
+    return {
+        "status": report.status,
+        "disclaimer": report.disclaimer,
+        "issues": [
+            {"severity": i.severity, "category": i.category, "message": i.message, "suggestion": i.suggestion}
+            for i in report.issues
+        ],
+    }

@@ -38,6 +38,18 @@ async def get_template(template_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+async def list_templates_full() -> list[dict]:
+    """Полные данные шаблонов (включая body_template) — для Document
+    Intelligence Engine, которому нужно и заполнять поля, и генерировать
+    content_blocks в одном проходе, без второго похода в БД."""
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "select * from nexa_docs_templates where is_active = true order by sort_order asc, name asc"
+        )
+    return [dict(r) for r in rows]
+
+
 async def list_documents(user_id: str, search: str | None = None) -> list[dict]:
     pool = await _pool_or_503()
     async with pool.acquire() as conn:
@@ -273,3 +285,21 @@ async def get_document_by_share_token(token: str) -> dict | None:
             token,
         )
     return dict(row) if row else None
+
+
+async def get_share_link_status(token: str) -> str:
+    """Возвращает 'ok' | 'revoked' | 'expired' | 'not_found' — чтобы
+    публичная страница показывала точную честную причину, а не общее
+    'документ недоступен' на все случаи (п.49 промпта)."""
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "select revoked_at, expires_at from nexa_docs_shares where token = $1", token
+        )
+    if not row:
+        return "not_found"
+    if row["revoked_at"] is not None:
+        return "revoked"
+    if row["expires_at"] is not None and row["expires_at"] <= datetime.now(timezone.utc):
+        return "expired"
+    return "ok"
