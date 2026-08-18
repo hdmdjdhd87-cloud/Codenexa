@@ -17,6 +17,7 @@ api.telegram.org, railway.app). Отмечай выполненное `[x]`, о�
 - [ ] **НОВОЕ — Выполнить `migrations/0004_ai_docs_seed_templates.sql`** (4 реальных шаблона: деловое письмо, заявление, расписка, договор оказания услуг).
 - [ ] **НОВОЕ — Выполнить `migrations/0005_register_ai_docs_module.sql`** (регистрирует AI Docs в каталоге CodeNexa — без этого модуль не появится на Главной/в Каталоге).
 - [ ] **НОВОЕ — Выполнить `migrations/0006_ai_docs_shares.sql`** (безопасные view-only ссылки на документы).
+- [ ] **НОВОЕ — Выполнить `migrations/0007_ai_docs_conversations.sql`** (хранение диалога с Document Intelligence Engine — без неё `/api/v1/aidocs/chat` вернёт 503).
 - [ ] Проверить, что появились таблицы: `nexa_users`, `nexa_modules`, `nexa_user_modules`, `nexa_favorites`, `nexa_projects`, `nexa_history`, `nexa_notifications`, `nexa_settings`, `nexa_docs_templates`, `nexa_docs_documents`, `nexa_docs_versions`.
 - [ ] Проверить, что старые таблицы (`services`, `bookings`, `working_hours`, `admin_users`, `audit_log`, `blocked_slots`, `booking_attempts`, `breaks`, `reviews`, `settings`) остались без изменений.
 
