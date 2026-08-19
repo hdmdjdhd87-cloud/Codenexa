@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { hideBackButton, showBackButton, haptic } from "@/lib/telegram";
 import { downloadAuthorizedFile } from "@/lib/apiClient";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { aidocsService, type AiDocsTemplate } from "@/services/aidocsService";
 import {
-  useAiStatus,
   useAiDocsTemplates,
   useAiDocsDocuments,
   useAiDocsDocument,
@@ -21,7 +20,7 @@ import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ModuleListSkeleton } from "@/components/states/Skeleton";
 
-type View = "home" | "list" | "templates" | "create" | "preview";
+type View = "home" | "list" | "templates" | "create" | "preview" | "chat";
 
 const CATEGORY_LABELS: Record<string, string> = {
   business: "Деловые",
@@ -51,8 +50,7 @@ export function AiDocsApp() {
   const [view, setView] = useState<View>("home");
   const [selectedTemplate, setSelectedTemplate] = useState<AiDocsTemplate | null>(null);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
-
-  const status = useAiStatus();
+  const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>(undefined);
 
   // Telegram BackButton: внутри модуля сначала возвращаемся на предыдущий
   // экран, и только с самой Главной AI Docs — обратно в каталог CodeNexa.
@@ -62,6 +60,7 @@ export function AiDocsApp() {
       else if (view === "preview") setView("list");
       else if (view === "templates") setView("home");
       else if (view === "list") setView("home");
+      else if (view === "chat") setView("home");
       else navigate("/catalog");
     };
     showBackButton(onBack);
@@ -72,18 +71,26 @@ export function AiDocsApp() {
     <div className="px-4 pt-5 pb-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-text-primary text-[20px] font-semibold">AI Docs</h1>
-        {status.data && !status.data.ai_available && (
-          <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-warning/15 text-warning">
-            AI недоступен
-          </span>
-        )}
       </div>
 
       {view === "home" && (
         <AiDocsHomeView
           onOpenList={() => setView("list")}
           onOpenTemplates={() => setView("templates")}
+          onOpenChat={(msg) => {
+            setChatInitialMessage(msg);
+            setView("chat");
+          }}
           onOpen={(id) => {
+            setActiveDocId(id);
+            setView("preview");
+          }}
+        />
+      )}
+      {view === "chat" && (
+        <ChatView
+          initialMessage={chatInitialMessage}
+          onDocumentCreated={(id) => {
             setActiveDocId(id);
             setView("preview");
           }}
@@ -127,13 +134,16 @@ export function AiDocsApp() {
 function AiDocsHomeView({
   onOpenList,
   onOpenTemplates,
+  onOpenChat,
   onOpen,
 }: {
   onOpenList: () => void;
   onOpenTemplates: () => void;
+  onOpenChat: (initialMessage?: string) => void;
   onOpen: (id: string) => void;
 }) {
   const documents = useAiDocsDocuments();
+  const [quickInput, setQuickInput] = useState("");
 
   const total = documents.data?.length ?? 0;
   const favoritesCount = (documents.data ?? []).filter((d) => d.is_favorite).length;
@@ -141,15 +151,41 @@ function AiDocsHomeView({
 
   return (
     <div>
-      <button
-        onClick={() => {
-          haptic("light");
-          onOpenTemplates();
+      <p className="text-text-secondary text-[13px] mb-4">
+        Создавайте и оформляйте документы — опишите задачу своими словами.
+      </p>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (quickInput.trim()) onOpenChat(quickInput.trim());
         }}
-        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] mb-4"
+        className="rounded-2xl bg-surface border border-border p-3.5 mb-5"
       >
-        + Создать документ
-      </button>
+        <textarea
+          value={quickInput}
+          onChange={(e) => setQuickInput(e.target.value)}
+          placeholder="Что нужно сделать с документом?"
+          rows={2}
+          className="w-full bg-transparent text-text-primary text-[13.5px] placeholder:text-text-secondary outline-none resize-none"
+        />
+        <div className="flex justify-end mt-1">
+          <button
+            type="submit"
+            onClick={() => haptic("light")}
+            className="px-4 py-2 rounded-xl bg-accent text-white text-[12.5px] font-semibold"
+          >
+            Отправить →
+          </button>
+        </div>
+      </form>
+
+      <div className="grid grid-cols-2 gap-2 mb-5">
+        <QuickAction label="Создать по шаблону" onClick={onOpenTemplates} />
+        <QuickAction label="Создать по фото" onClick={onOpenTemplates} />
+        <QuickAction label="Мои документы" onClick={onOpenList} />
+        <QuickAction label="Написать AI Docs" onClick={() => onOpenChat()} />
+      </div>
 
       <div className="grid grid-cols-3 gap-2 mb-5">
         <StatCard label="Документов" value={total} />
@@ -182,6 +218,20 @@ function AiDocsHomeView({
         Все документы {total > 0 ? `(${total})` : ""}
       </button>
     </div>
+  );
+}
+
+function QuickAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={() => {
+        haptic("light");
+        onClick();
+      }}
+      className="rounded-xl bg-surface border border-border py-3 px-3 text-left text-[12.5px] font-semibold text-text-primary"
+    >
+      {label}
+    </button>
   );
 }
 
@@ -303,6 +353,138 @@ function DocumentListView({ onCreateClick, onOpen }: { onCreateClick: () => void
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================= TEMPLATES ============================= */
+
+/* ============================= CHAT ============================= */
+
+interface ChatMessage {
+  role: "user" | "agent";
+  text: string;
+}
+
+function ChatView({
+  initialMessage,
+  onDocumentCreated,
+}: {
+  initialMessage?: string;
+  onDocumentCreated: (id: string) => void;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: "agent", text: "Опишите, какой документ нужен — я помогу собрать данные и создать его." },
+  ]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [quickActions, setQuickActions] = useState<string[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentInitial = useRef(false);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  async function send(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+    setError(null);
+    setSending(true);
+    setMessages((m) => [...m, { role: "user", text: trimmed }]);
+    setInput("");
+    haptic("light");
+    try {
+      const reply = await aidocsService.chat(trimmed, conversationId);
+      setConversationId(reply.conversation_id);
+      setMessages((m) => [...m, { role: "agent", text: reply.reply }]);
+      setQuickActions(reply.quick_actions || []);
+      if (reply.document) {
+        haptic("success");
+        onDocumentCreated(reply.document.id);
+      }
+    } catch (e) {
+      haptic("error");
+      setError(e instanceof Error ? e.message : "Не удалось отправить сообщение.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  useEffect(() => {
+    if (initialMessage && !sentInitial.current) {
+      sentInitial.current = true;
+      send(initialMessage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage]);
+
+  return (
+    <div className="flex flex-col" style={{ height: "calc(100vh - 140px)" }}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col gap-2.5 pb-3">
+        {messages.map((m, i) => (
+          <div
+            key={i}
+            className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-line ${
+              m.role === "user" ? "self-end bg-accent text-white" : "self-start bg-surface border border-border text-text-primary"
+            }`}
+          >
+            {m.text}
+          </div>
+        ))}
+        {sending && (
+          <div className="self-start bg-surface border border-border rounded-2xl px-3.5 py-2.5 text-[13px] text-text-secondary">
+            Печатает…
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-error text-[12px] mb-2">{error}</p>}
+
+      {quickActions.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap mb-2">
+          {quickActions.map((qa) => (
+            <button
+              key={qa}
+              onClick={() => send(qa === "create" ? "да" : qa === "edit" ? "нет, изменить" : qa)}
+              className="px-3 py-1.5 rounded-full bg-surface border border-border text-text-primary text-[12px] font-semibold"
+            >
+              {qa === "create" ? "Создать" : qa === "edit" ? "Изменить" : qa}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(input);
+        }}
+        className="flex items-end gap-2 pt-2 border-t border-border"
+      >
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send(input);
+            }
+          }}
+          rows={1}
+          placeholder="Напишите сообщение…"
+          className="flex-1 rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-secondary outline-none resize-none focus:border-accent"
+        />
+        <button
+          type="submit"
+          disabled={sending || !input.trim()}
+          className="shrink-0 w-10 h-10 rounded-xl bg-accent text-white font-semibold disabled:opacity-50"
+        >
+          →
+        </button>
+      </form>
     </div>
   );
 }

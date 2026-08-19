@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import t from "@/i18n";
 import { useModules } from "@/hooks/useModules";
@@ -7,10 +7,12 @@ import { getModuleComponent } from "@/modules/registry";
 import { LoadingState } from "@/components/states/LoadingState";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ErrorState } from "@/components/states/ErrorState";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export function ModuleRoutePage() {
   const { moduleKey } = useParams<{ moduleKey: string }>();
   const modules = useModules();
+  const [boundaryKey, setBoundaryKey] = useState(0);
 
   const module = modules.data?.find((m) => m.module_key === moduleKey);
   const Component = moduleKey ? getModuleComponent(moduleKey) : null;
@@ -49,8 +51,10 @@ export function ModuleRoutePage() {
   }
 
   return (
-    <Suspense fallback={<LoadingState />}>
-      <Component />
-    </Suspense>
+    <ErrorBoundary key={boundaryKey} onReset={() => setBoundaryKey((k) => k + 1)}>
+      <Suspense fallback={<LoadingState />}>
+        <Component />
+      </Suspense>
+    </ErrorBoundary>
   );
 }

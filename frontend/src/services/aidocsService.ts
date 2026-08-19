@@ -39,6 +39,21 @@ export interface AiDocsVersion {
   created_at: string;
 }
 
+export interface AiDocsChatReply {
+  conversation_id: string;
+  reply: string;
+  status: "idle" | "collecting" | "ready_to_create" | "done";
+  quick_actions: string[];
+  ready_to_create: boolean;
+  document: AiDocsDocument | null;
+}
+
+export interface AiDocsConversation {
+  id: string;
+  status: string;
+  messages: { role: "user" | "agent"; text: string; created_at: string }[];
+}
+
 export interface AiDocsShare {
   id: string;
   token: string;
@@ -70,6 +85,14 @@ export const aidocsService = {
   revokeShare: (shareId: string) => apiRequest<{ status: string }>(`/api/v1/aidocs/shares/${shareId}`, { method: "DELETE" }),
   shareUrl: (token: string) => `${API_BASE_URL}/api/v1/aidocs/shared/${token}`,
   exportUrl: (id: string, format: "docx" | "pdf") => `${API_BASE_URL}/api/v1/aidocs/documents/${id}/export/${format}`,
+  chat: (message: string, conversation_id?: string) =>
+    apiRequest<AiDocsChatReply>("/api/v1/aidocs/chat", { method: "POST", body: { message, conversation_id } }),
+  activeConversation: () => apiRequest<AiDocsConversation>("/api/v1/aidocs/conversations/active/current"),
+  analyze: (id: string) =>
+    apiRequest<{ status: string; disclaimer: string; issues: { severity: string; category: string; message: string; suggestion: string | null }[] }>(
+      `/api/v1/aidocs/documents/${id}/analyze`,
+      { method: "POST" }
+    ),
   async ocr(file: File): Promise<{ text: string; structural_understanding_available: boolean }> {
     const { getStoredToken } = await import("@/lib/tokenStorage");
     const token = getStoredToken();
