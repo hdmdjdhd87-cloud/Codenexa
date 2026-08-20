@@ -406,60 +406,74 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
     Document Intelligence Engine — rule-based (regex/scoring), БЕЗ
     внешнего AI API (см. app/document_intelligence/). Живой диалог,
     но интеллект — сопоставление с образцом, не понимание языка.
-    """
-    if payload.conversation_id:
-        conv = await conv_repo.get_conversation(user_id, payload.conversation_id)
-        if not conv:
-            raise api_error(status.HTTP_404_NOT_FOUND, "CONVERSATION_NOT_FOUND", "Диалог не найден.")
-    else:
-        conv = await conv_repo.get_or_create_active_conversation(user_id)
 
+    Чтение+обработка+запись состояния диалога выполняются атомарно
+    (SELECT ... FOR UPDATE в одной транзакции, conv_repo.
+    with_locked_conversation) — защита от гонки при двойном/почти
+    одновременном сообщении (п.34 промпта: идемпотентность операций
+    создания документа не должна держаться только на disabled-кнопке
+    фронтенда).
+    """
     templates = await repo.list_templates_full()
     templates_by_key = {t["template_key"]: t for t in templates}
-
     agent = DocumentAgent(lambda key: templates_by_key.get(key), None)
-    state = ConversationState(
-        status=conv["status"],
-        intent=conv["intent"],
-        template_key=conv["template_key"],
-        field_values=dict(conv["field_values"] or {}),
-        awaiting_field=conv["awaiting_field"],
-    )
 
-    reply = agent.handle_message(state, payload.message)
+    reply_holder: dict = {}
+    created_document_holder: dict = {}
 
-    messages = list(conv["messages"] or [])
-    messages.append({"role": "user", "text": payload.message, "created_at": conv_repo.now_iso()})
-    messages.append({"role": "agent", "text": reply.message, "created_at": conv_repo.now_iso()})
+    async def mutate(conv_row: dict):
+        state = ConversationState(
+            status=conv_row["status"],
+            intent=conv_row["intent"],
+            template_key=conv_row["template_key"],
+            field_values=dict(conv_row["field_values"] or {}),
+            awaiting_field=conv_row["awaiting_field"],
+        )
 
-    created_document = None
-    if reply.ready_to_create and state.status == "done" and state.template_key:
-        template = templates_by_key.get(state.template_key)
-        if template:
-            content_blocks = fill_template(template["body_template"], state.field_values)
-            created_document = await repo.create_document(
-                user_id, template["id"], template["name"], template["category"], state.field_values, content_blocks
-            )
-            await add_history_event(
-                user_id, "document_create_via_chat",
-                metadata={"document_id": str(created_document["id"]), "template_key": state.template_key},
-            )
+        reply = agent.handle_message(state, payload.message)
+        reply_holder["reply"] = reply
+        reply_holder["state_status"] = state.status
 
-    updated_conv = await conv_repo.save_conversation_state(
-        conv["id"],
-        state.status,
-        state.intent,
-        state.template_key,
-        state.field_values,
-        state.awaiting_field,
-        messages,
-        document_id=str(created_document["id"]) if created_document else None,
-    )
+        messages = list(conv_row["messages"] or [])
+        messages.append({"role": "user", "text": payload.message, "created_at": conv_repo.now_iso()})
+        messages.append({"role": "agent", "text": reply.message, "created_at": conv_repo.now_iso()})
+
+        created_document = None
+        if reply.ready_to_create and state.status == "done" and state.template_key:
+            template = templates_by_key.get(state.template_key)
+            if template:
+                content_blocks = fill_template(template["body_template"], state.field_values)
+                created_document = await repo.create_document(
+                    user_id, template["id"], template["name"], template["category"], state.field_values, content_blocks
+                )
+                await add_history_event(
+                    user_id, "document_create_via_chat",
+                    metadata={"document_id": str(created_document["id"]), "template_key": state.template_key},
+                )
+                created_document_holder["doc"] = created_document
+
+        new_values = {
+            "status": state.status,
+            "intent": state.intent,
+            "template_key": state.template_key,
+            "field_values": state.field_values,
+            "awaiting_field": state.awaiting_field,
+            "messages": messages,
+            "document_id": str(created_document["id"]) if created_document else None,
+        }
+        return new_values, None
+
+    updated_conv, _ = await conv_repo.with_locked_conversation(user_id, payload.conversation_id, mutate)
+    if updated_conv is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, "CONVERSATION_NOT_FOUND", "Диалог не найден.")
+
+    reply = reply_holder["reply"]
+    created_document = created_document_holder.get("doc")
 
     return {
         "conversation_id": str(updated_conv["id"]),
         "reply": reply.message,
-        "status": state.status,
+        "status": reply_holder["state_status"],
         "quick_actions": reply.quick_actions,
         "ready_to_create": reply.ready_to_create,
         "document": created_document,

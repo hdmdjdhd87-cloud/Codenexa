@@ -448,8 +448,9 @@ function ChatView({
           {quickActions.map((qa) => (
             <button
               key={qa}
+              disabled={sending}
               onClick={() => send(qa === "create" ? "да" : qa === "edit" ? "нет, изменить" : qa)}
-              className="px-3 py-1.5 rounded-full bg-surface border border-border text-text-primary text-[12px] font-semibold"
+              className="px-3 py-1.5 rounded-full bg-surface border border-border text-text-primary text-[12px] font-semibold disabled:opacity-50"
             >
               {qa === "create" ? "Создать" : qa === "edit" ? "Изменить" : qa}
             </button>
