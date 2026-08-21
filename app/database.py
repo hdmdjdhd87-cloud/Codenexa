@@ -22,12 +22,7 @@ _pool: Optional[asyncpg.Pool] = None
 
 async def _init_connection(conn: asyncpg.Connection) -> None:
     # КРИТИЧНО: без этого asyncpg возвращает jsonb-колонки как СЫРУЮ
-    # строку, а не распарсенный Python-объект — content_blocks/
-    # fields_schema/metadata приходили бы фронтенду строкой вместо
-    # массива/объекта, что ломало .map() на клиенте (реальный баг,
-    # найденный при первом сквозном тесте AI Docs — "чёрный экран" при
-    # открытии шаблона). Кодек регистрируется на КАЖДОЕ новое
-    # соединение пула через init=.
+    # строку, а не распарсенный Python-объект.
     for pg_type in ("jsonb", "json"):
         await conn.set_type_codec(
             pg_type,
@@ -52,17 +47,19 @@ async def connect() -> None:
             min_size=1,
             max_size=10,
             command_timeout=10,
-            # Railway -> Supabase Supavisor transaction pooler (порт 6543)
-            # не должен использовать asyncpg prepared-statement cache.
-            # Иначе при повторном использовании/смене backend-соединения
-            # возможны "prepared statement already exists/does not exist",
-            # после чего auth/users endpoints начинают отдавать 503.
+            # Supabase PostgreSQL требует TLS для внешних подключений.
+            # Явно включаем SSL, чтобы одинаково работать с прямым
+            # подключением :5432 и Supavisor pooler :6543.
+            ssl="require",
+            # Для Supabase/Supavisor transaction pooler отключаем
+            # prepared-statement cache. Это также безопасно для прямого
+            # PostgreSQL подключения.
             statement_cache_size=0,
             init=_init_connection,
         )
         logger.info(
             "Пул подключений к PostgreSQL создан "
-            "(jsonb-кодек зарегистрирован, statement cache отключён)"
+            "(SSL=require, jsonb-кодек зарегистрирован, statement cache отключён)"
         )
     except Exception:  # noqa: BLE001 — сознательно широкий catch на старте
         logger.exception("Не удалось подключиться к PostgreSQL")
