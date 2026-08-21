@@ -5,17 +5,12 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { ApiClientError } from "@/lib/apiClient";
+import { clearStoredToken } from "@/lib/tokenStorage";
 
 interface AuthGateProps {
   children: React.ReactNode;
 }
 
-/**
- * Гарантирует, что дальше рендерится только авторизованное состояние.
- * useCurrentUser() сам триггерит POST /api/v1/auth/telegram через
- * apiClient (см. ensureToken), если валидного токена ещё нет — сюда
- * не нужно дублировать логику авторизации.
- */
 export function AuthGate({ children }: AuthGateProps) {
   const [telegramReady, setTelegramReady] = useState(false);
   const user = useCurrentUser();
@@ -28,24 +23,29 @@ export function AuthGate({ children }: AuthGateProps) {
   if (!telegramReady) return <LoadingState />;
 
   if (!isInsideTelegram() && import.meta.env.PROD) {
-    return (
-      <ErrorState message="Откройте это приложение через Telegram." />
-    );
+    return <ErrorState message="Откройте это приложение через Telegram." />;
   }
 
   if (user.isLoading) return <LoadingState />;
+
   if (user.isError) {
-    // Пользователю — понятное сообщение (п.27 спецификации: не техническая
-    // ошибка на экране). Технические детали — только в консоль разработчика.
     const err = user.error;
-    if (err instanceof ApiClientError) {
-      console.error(`Auth failed: [${err.code}] ${err.message} (status ${err.status})`);
-    } else {
-      console.error("Auth failed:", err);
+    console.error("Auth failed:", err);
+
+    // A new database invalidates users/sessions created in the old database.
+    // Drop the stale JWT so apiClient performs a fresh Telegram authentication.
+    if (err instanceof ApiClientError && (err.status === 401 || err.status === 404)) {
+      clearStoredToken();
+      return (
+        <ErrorState
+          message="Сессия устарела. Повторно открываем авторизацию через Telegram…"
+          onRetry={() => user.refetch()}
+        />
+      );
     }
+
     return <ErrorState message={t("errors.authFailed")} onRetry={() => user.refetch()} />;
   }
 
   return <>{children}</>;
 }
-
