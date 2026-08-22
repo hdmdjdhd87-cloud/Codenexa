@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, UploadFile, File, Query, HTTPException
+from fastapi import APIRouter, Depends, Response, UploadFile, File, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -21,6 +21,7 @@ from app.ai.provider import ai_is_configured
 from app.repositories import conversation_repository as conv_repo
 from app.document_intelligence.agent import DocumentAgent, ConversationState
 from app.document_intelligence.analyzer import analyze_document
+from app.document_intelligence.ocr_autofill import suggest_field_values
 from app.document_engine.version_diff import diff_content_blocks, diff_result_to_dict
 from app.utils.errors import api_error
 from fastapi import status
@@ -191,11 +192,21 @@ def _safe_filename(title: str) -> str:
 
 
 @router.post("/ocr")
-async def ocr_image(file: UploadFile = File(...), user_id: str = Depends(get_current_user_id)) -> dict:
+async def ocr_image(
+    file: UploadFile = File(...),
+    template_id: str | None = Form(None),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
     """
     Настоящий OCR (Tesseract) — извлекает сырой текст из фото/скана.
     НЕ понимает структуру документа (это требует AI, см. app/ai/provider.py) —
     честно возвращает только распознанный текст.
+
+    template_id (опционально, п.5 промпта): если передан, дополнительно
+    прогоняет распознанный текст через extract_entities() и предлагает
+    автозаполнение полей формы (только там, где сущность найдена
+    надёжно — деньги/дата/срок/телефон/email), а не просто отдаёт текст
+    для ручного переноса.
     """
     data = await file.read()
     try:
@@ -204,7 +215,18 @@ async def ocr_image(file: UploadFile = File(...), user_id: str = Depends(get_cur
         raise api_error(status.HTTP_400_BAD_REQUEST, "OCR_FAILED", str(exc)) from exc
 
     await add_history_event(user_id, "document_ocr", metadata={"chars_extracted": len(text)})
-    return {"text": text, "structural_understanding_available": ai_is_configured()}
+
+    suggested_fields: dict[str, str] = {}
+    if template_id and text:
+        template = await repo.get_template(template_id)
+        if template:
+            suggested_fields = suggest_field_values(template["fields_schema"], text)
+
+    return {
+        "text": text,
+        "structural_understanding_available": ai_is_configured(),
+        "suggested_fields": suggested_fields,
+    }
 
 
 class RenameRequest(BaseModel):

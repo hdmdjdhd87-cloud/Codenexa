@@ -129,11 +129,15 @@ export const aidocsService = {
     apiRequest<AiDocsChatReply>("/api/v1/aidocs/chat", { method: "POST", body: { message, conversation_id, document_id } }),
   activeConversation: () => apiRequest<AiDocsConversation>("/api/v1/aidocs/conversations/active/current"),
   analyze: (id: string) => apiRequest<AiDocsAnalysis>(`/api/v1/aidocs/documents/${id}/analyze`, { method: "POST" }),
-  async ocr(file: File): Promise<{ text: string; structural_understanding_available: boolean }> {
+  async ocr(
+    file: File,
+    templateId?: string
+  ): Promise<{ text: string; structural_understanding_available: boolean; suggested_fields: Record<string, string> }> {
     const { getStoredToken } = await import("@/lib/tokenStorage");
     const token = getStoredToken();
     const form = new FormData();
     form.append("file", file);
+    if (templateId) form.append("template_id", templateId);
     const resp = await fetch(`${API_BASE_URL}/api/v1/aidocs/ocr`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -143,7 +147,7 @@ export const aidocsService = {
     if (!resp.ok) {
       throw new Error(body?.error?.message || "Не удалось распознать изображение.");
     }
-    return body;
+    return { suggested_fields: {}, ...body };
   },
   importDocument: async (file: File, title?: string): Promise<AiDocsDocument> => {
     const { getStoredToken } = await import("@/lib/tokenStorage");

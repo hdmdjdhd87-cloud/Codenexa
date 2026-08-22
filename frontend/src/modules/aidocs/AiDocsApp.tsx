@@ -579,6 +579,7 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrText, setOcrText] = useState<string | null>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
+  const [suggestedFields, setSuggestedFields] = useState<Record<string, string>>({});
   const create = useCreateAiDoc();
 
   function setField(key: string, value: string) {
@@ -588,11 +589,13 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
   async function handlePhotoUpload(file: File) {
     setOcrError(null);
     setOcrText(null);
+    setSuggestedFields({});
     setOcrLoading(true);
     haptic("light");
     try {
-      const result = await aidocsService.ocr(file);
+      const result = await aidocsService.ocr(file, template.id);
       setOcrText(result.text || "");
+      setSuggestedFields(result.suggested_fields || {});
       if (!result.text) {
         setOcrError("Текст на изображении не распознан. Попробуйте более чёткое фото.");
       }
@@ -601,6 +604,11 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
     } finally {
       setOcrLoading(false);
     }
+  }
+
+  function applyAllSuggestions() {
+    setValues((v) => ({ ...v, ...suggestedFields }));
+    haptic("success");
   }
 
   async function handleSubmit() {
@@ -647,11 +655,22 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
         {ocrText && (
           <div className="mt-2.5">
             <p className="text-text-secondary text-[11px] mb-1">
-              Распознанный текст (перенесите нужное в поля вручную — автоматическое понимание структуры требует AI, пока недоступно):
+              Распознанный текст (автоматическое понимание структуры целиком требует AI, пока недоступно — но
+              сумму/срок/дату/телефон/email ниже уже удалось сопоставить с полями):
             </p>
             <div className="rounded-lg bg-surface-elevated p-2.5 text-[12px] text-text-primary whitespace-pre-wrap max-h-32 overflow-y-auto">
               {ocrText}
             </div>
+            {Object.keys(suggestedFields).length > 0 && (
+              <div className="mt-2.5 rounded-lg bg-accent/10 border border-accent/30 p-2.5 flex items-center justify-between gap-2">
+                <p className="text-text-primary text-[12px]">
+                  Найдено полей для автозаполнения: {Object.keys(suggestedFields).length}
+                </p>
+                <button onClick={applyAllSuggestions} className="shrink-0 text-accent text-[12px] font-semibold">
+                  Заполнить всё
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -677,6 +696,14 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
                 onChange={(e) => setField(field.key, e.target.value)}
                 className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary outline-none focus:border-accent"
               />
+            )}
+            {suggestedFields[field.key] && suggestedFields[field.key] !== values[field.key] && (
+              <button
+                onClick={() => setField(field.key, suggestedFields[field.key])}
+                className="mt-1.5 text-[11.5px] text-accent font-medium"
+              >
+                Использовать из фото: «{suggestedFields[field.key]}»
+              </button>
             )}
           </div>
         ))}
