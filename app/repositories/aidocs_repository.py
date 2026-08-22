@@ -167,6 +167,117 @@ async def list_versions(user_id: str, document_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def get_version(user_id: str, document_id: str, version_id: str) -> dict | None:
+    """Одна версия документа с проверкой владения через join на nexa_docs_documents
+    (нельзя получить версию чужого документа подменой version_id)."""
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            select v.id, v.document_id, v.version_number, v.content_blocks, v.note, v.created_at
+            from nexa_docs_versions v
+            join nexa_docs_documents d on d.id = v.document_id
+            where v.id = $1 and v.document_id = $2 and d.user_id = $3
+            """,
+            version_id,
+            document_id,
+            user_id,
+        )
+    return dict(row) if row else None
+
+
+async def get_two_versions(user_id: str, document_id: str, version_id_a: str, version_id_b: str) -> dict | None:
+    """Обе версии одним запросом для Compare — возвращает None если
+    документ не принадлежит пользователю или одна из версий не найдена/
+    относится к другому документу."""
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        owner_check = await conn.fetchval(
+            "select 1 from nexa_docs_documents where id = $1 and user_id = $2", document_id, user_id
+        )
+        if not owner_check:
+            return None
+        rows = await conn.fetch(
+            """
+            select id, version_number, content_blocks, note, created_at
+            from nexa_docs_versions
+            where document_id = $1 and id = any($2::uuid[])
+            """,
+            document_id,
+            [version_id_a, version_id_b],
+        )
+    by_id = {str(r["id"]): dict(r) for r in rows}
+    if version_id_a not in by_id or version_id_b not in by_id:
+        return None
+    return {"a": by_id[version_id_a], "b": by_id[version_id_b]}
+
+
+async def restore_version(user_id: str, document_id: str, version_id: str) -> dict | None:
+    """
+    Восстановление версии (п.2 промпта): НЕ откатывает историю, а
+    создаёт НОВУЮ версию (следующий version_number) с content_blocks
+    старой версии — история не теряется, "Restore" это forward-only
+    операция, как и полагается версионированию (та же семантика, что
+    у git revert, а не git reset).
+
+    Атомарно (одна транзакция): вставка новой версии + обновление
+    content_blocks в самом документе (то, что реально рендерится в
+    экспорт/публичный просмотр/чат), иначе можно словить рассинхрон
+    между таблицами при падении между двумя запросами.
+    """
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # SELECT ... FOR UPDATE — тот же паттерн защиты от гонки, что и
+            # в conversation_repository: два restore подряд не должны
+            # породить две версии с одинаковым version_number.
+            doc = await conn.fetchrow(
+                "select id from nexa_docs_documents where id = $1 and user_id = $2 for update",
+                document_id,
+                user_id,
+            )
+            if not doc:
+                return None
+
+            source_version = await conn.fetchrow(
+                "select content_blocks, version_number from nexa_docs_versions where id = $1 and document_id = $2",
+                version_id,
+                document_id,
+            )
+            if not source_version:
+                return None
+
+            next_number = await conn.fetchval(
+                "select coalesce(max(version_number), 0) + 1 from nexa_docs_versions where document_id = $1",
+                document_id,
+            )
+
+            new_version = await conn.fetchrow(
+                """
+                insert into nexa_docs_versions (document_id, version_number, content_blocks, note)
+                values ($1, $2, $3, $4)
+                returning id, version_number, note, created_at
+                """,
+                document_id,
+                next_number,
+                source_version["content_blocks"],
+                f'Восстановлено из версии {source_version["version_number"]}',
+            )
+
+            updated_doc = await conn.fetchrow(
+                """
+                update nexa_docs_documents
+                set content_blocks = $2
+                where id = $1
+                returning *
+                """,
+                document_id,
+                source_version["content_blocks"],
+            )
+
+    return {"document": dict(updated_doc), "version": dict(new_version)}
+
+
 async def rename_document(user_id: str, document_id: str, new_title: str) -> dict | None:
     pool = await _pool_or_503()
     async with pool.acquire() as conn:

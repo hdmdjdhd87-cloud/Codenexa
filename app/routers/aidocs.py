@@ -21,6 +21,7 @@ from app.ai.provider import ai_is_configured
 from app.repositories import conversation_repository as conv_repo
 from app.document_intelligence.agent import DocumentAgent, ConversationState
 from app.document_intelligence.analyzer import analyze_document
+from app.document_engine.version_diff import diff_content_blocks, diff_result_to_dict
 from app.utils.errors import api_error
 from fastapi import status
 
@@ -107,6 +108,46 @@ async def set_favorite(document_id: str, payload: FavoriteRequest, user_id: str 
 @router.get("/documents/{document_id}/versions")
 async def get_versions(document_id: str, user_id: str = Depends(get_current_user_id)) -> list[dict]:
     return await repo.list_versions(user_id, document_id)
+
+
+@router.post("/documents/{document_id}/versions/{version_id}/restore")
+async def restore_version(document_id: str, version_id: str, user_id: str = Depends(get_current_user_id)) -> dict:
+    """
+    Восстановление версии (п.2 промпта). Создаёт НОВУЮ версию поверх
+    существующей истории (не удаляет и не переписывает старые версии) —
+    см. docstring repo.restore_version.
+    """
+    result = await repo.restore_version(user_id, document_id, version_id)
+    if not result:
+        raise api_error(status.HTTP_404_NOT_FOUND, "VERSION_NOT_FOUND", "Версия или документ не найдены.")
+    await add_history_event(
+        user_id,
+        "document_version_restore",
+        metadata={"document_id": document_id, "restored_from_version_id": version_id},
+    )
+    return {"document": result["document"], "version": result["version"]}
+
+
+@router.get("/documents/{document_id}/versions/compare")
+async def compare_versions(
+    document_id: str,
+    from_version_id: str = Query(..., alias="from"),
+    to_version_id: str = Query(..., alias="to"),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
+    """Structural diff между двумя версиями (п.3 промпта) — added/removed/changed
+    по content_blocks, без внешних AI/LLM: SequenceMatcher над блоками + word-level
+    diff внутри изменённых блоков (app/document_engine/version_diff.py)."""
+    versions = await repo.get_two_versions(user_id, document_id, from_version_id, to_version_id)
+    if not versions:
+        raise api_error(status.HTTP_404_NOT_FOUND, "VERSION_NOT_FOUND", "Одна из версий или документ не найдены.")
+
+    diff = diff_content_blocks(versions["a"]["content_blocks"], versions["b"]["content_blocks"])
+    return {
+        "from": {"version_number": versions["a"]["version_number"], "created_at": versions["a"]["created_at"]},
+        "to": {"version_number": versions["b"]["version_number"], "created_at": versions["b"]["created_at"]},
+        "diff": diff_result_to_dict(diff),
+    }
 
 
 @router.get("/documents/{document_id}/export/docx")
