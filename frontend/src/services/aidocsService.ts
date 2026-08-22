@@ -46,6 +46,7 @@ export interface AiDocsChatReply {
   quick_actions: string[];
   ready_to_create: boolean;
   document: AiDocsDocument | null;
+  edited_document: AiDocsDocument | null;
 }
 
 export interface AiDocsConversation {
@@ -124,8 +125,8 @@ export const aidocsService = {
   revokeShare: (shareId: string) => apiRequest<{ status: string }>(`/api/v1/aidocs/shares/${shareId}`, { method: "DELETE" }),
   shareUrl: (token: string) => `${API_BASE_URL}/api/v1/aidocs/shared/${token}`,
   exportUrl: (id: string, format: "docx" | "pdf") => `${API_BASE_URL}/api/v1/aidocs/documents/${id}/export/${format}`,
-  chat: (message: string, conversation_id?: string) =>
-    apiRequest<AiDocsChatReply>("/api/v1/aidocs/chat", { method: "POST", body: { message, conversation_id } }),
+  chat: (message: string, conversation_id?: string, document_id?: string) =>
+    apiRequest<AiDocsChatReply>("/api/v1/aidocs/chat", { method: "POST", body: { message, conversation_id, document_id } }),
   activeConversation: () => apiRequest<AiDocsConversation>("/api/v1/aidocs/conversations/active/current"),
   analyze: (id: string) => apiRequest<AiDocsAnalysis>(`/api/v1/aidocs/documents/${id}/analyze`, { method: "POST" }),
   async ocr(file: File): Promise<{ text: string; structural_understanding_available: boolean }> {

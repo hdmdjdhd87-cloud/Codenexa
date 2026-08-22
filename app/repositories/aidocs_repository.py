@@ -278,6 +278,49 @@ async def restore_version(user_id: str, document_id: str, version_id: str) -> di
     return {"document": dict(updated_doc), "version": dict(new_version)}
 
 
+async def apply_edit(user_id: str, document_id: str, content_blocks: list[dict], note: str) -> dict | None:
+    """
+    Персистит результат EDIT_DOCUMENT/CHANGE_FIELD команды из чата
+    (п.1 промпта) — та же атомарная схема "новая версия + обновление
+    документа", что и в restore_version (SELECT...FOR UPDATE защищает
+    от гонки при повторной отправке одной и той же команды/двойном
+    клике "Отправить" в чате).
+    """
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            doc = await conn.fetchrow(
+                "select id from nexa_docs_documents where id = $1 and user_id = $2 for update",
+                document_id,
+                user_id,
+            )
+            if not doc:
+                return None
+
+            next_number = await conn.fetchval(
+                "select coalesce(max(version_number), 0) + 1 from nexa_docs_versions where document_id = $1",
+                document_id,
+            )
+
+            await conn.execute(
+                """
+                insert into nexa_docs_versions (document_id, version_number, content_blocks, note)
+                values ($1, $2, $3::jsonb, $4)
+                """,
+                document_id,
+                next_number,
+                content_blocks,
+                note,
+            )
+
+            updated_doc = await conn.fetchrow(
+                "update nexa_docs_documents set content_blocks = $2::jsonb where id = $1 returning *",
+                document_id,
+                content_blocks,
+            )
+    return dict(updated_doc)
+
+
 async def rename_document(user_id: str, document_id: str, new_title: str) -> dict | None:
     pool = await _pool_or_503()
     async with pool.acquire() as conn:

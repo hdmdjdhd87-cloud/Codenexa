@@ -439,6 +439,7 @@ async def import_document(
 class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
+    document_id: str | None = None  # чтобы редактировать конкретный открытый документ через чат (п.1 промпта)
 
 
 @router.post("/chat")
@@ -454,21 +455,48 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
     одновременном сообщении (п.34 промпта: идемпотентность операций
     создания документа не должна держаться только на disabled-кнопке
     фронтенда).
+
+    document_id (опционально): фронтенд передаёт id открытого документа,
+    когда чат вызывается из его превью — это включает EDIT_DOCUMENT/
+    CHANGE_FIELD (п.1 промпта: редактирование существующего документа
+    через чат). Значение сохраняется в диалоге и переживает последующие
+    сообщения без document_id (coalesce на уровне conv_repo).
     """
     templates = await repo.list_templates_full()
     templates_by_key = {t["template_key"]: t for t in templates}
-    agent = DocumentAgent(lambda key: templates_by_key.get(key), None)
+    templates_by_id = {str(t["id"]): t for t in templates}
 
     reply_holder: dict = {}
     created_document_holder: dict = {}
+    edited_document_holder: dict = {}
 
     async def mutate(conv_row: dict):
+        target_document_id = payload.document_id or (
+            str(conv_row["document_id"]) if conv_row.get("document_id") else None
+        )
+        target_document: dict | None = None
+        if target_document_id:
+            target_document = await repo.get_document(user_id, target_document_id)
+            if not target_document:
+                # чужой/удалённый документ — не поднимаем ошибку всего чата,
+                # просто честно теряем контекст редактирования, agent сам
+                # ответит "не удалось найти документ" при попытке его править
+                target_document_id = None
+
+        agent = DocumentAgent(
+            lambda key: templates_by_key.get(key),
+            None,
+            get_document_by_id=(lambda doc_id, _doc=target_document: _doc if _doc and str(_doc["id"]) == str(doc_id) else None),
+            get_template_by_id=lambda template_id: templates_by_id.get(str(template_id)),
+        )
+
         state = ConversationState(
             status=conv_row["status"],
             intent=conv_row["intent"],
             template_key=conv_row["template_key"],
             field_values=dict(conv_row["field_values"] or {}),
             awaiting_field=conv_row["awaiting_field"],
+            document_id=target_document_id,
         )
 
         reply = agent.handle_message(state, payload.message)
@@ -493,6 +521,18 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
                 )
                 created_document_holder["doc"] = created_document
 
+        if reply.document_edit:
+            updated_document = await repo.apply_edit(
+                user_id, reply.document_edit.document_id, reply.document_edit.content_blocks, reply.document_edit.note
+            )
+            if updated_document:
+                await add_history_event(
+                    user_id,
+                    "document_edit_via_chat",
+                    metadata={"document_id": reply.document_edit.document_id, "note": reply.document_edit.note},
+                )
+                edited_document_holder["doc"] = updated_document
+
         new_values = {
             "status": state.status,
             "intent": state.intent,
@@ -500,7 +540,7 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
             "field_values": state.field_values,
             "awaiting_field": state.awaiting_field,
             "messages": messages,
-            "document_id": str(created_document["id"]) if created_document else None,
+            "document_id": str(created_document["id"]) if created_document else target_document_id,
         }
         return new_values, None
 
@@ -510,6 +550,7 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
 
     reply = reply_holder["reply"]
     created_document = created_document_holder.get("doc")
+    edited_document = edited_document_holder.get("doc")
 
     return {
         "conversation_id": str(updated_conv["id"]),
@@ -518,6 +559,7 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
         "quick_actions": reply.quick_actions,
         "ready_to_create": reply.ready_to_create,
         "document": created_document,
+        "edited_document": edited_document,
     }
 
 

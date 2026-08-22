@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { hideBackButton, showBackButton, haptic } from "@/lib/telegram";
 import { downloadAuthorizedFile } from "@/lib/apiClient";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -23,7 +24,7 @@ import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ModuleListSkeleton } from "@/components/states/Skeleton";
 
-type View = "home" | "list" | "templates" | "create" | "preview" | "chat";
+type View = "home" | "list" | "templates" | "create" | "preview" | "chat" | "edit_chat";
 
 const CATEGORY_LABELS: Record<string, string> = {
   business: "Деловые",
@@ -61,6 +62,7 @@ export function AiDocsApp() {
     const onBack = () => {
       if (view === "create") setView("templates");
       else if (view === "preview") setView("list");
+      else if (view === "edit_chat") setView("preview");
       else if (view === "templates") setView("home");
       else if (view === "list") setView("home");
       else if (view === "chat") setView("home");
@@ -99,6 +101,14 @@ export function AiDocsApp() {
           }}
         />
       )}
+      {view === "edit_chat" && activeDocId && (
+        <ChatView
+          documentId={activeDocId}
+          initialGreeting='Что нужно изменить в документе? Например: «замени сумму 150000 на 200000», «добавь пункт: Гарантия 12 месяцев», «измени срок на 6 месяцев».'
+          onDocumentCreated={() => {}}
+          onDocumentEdited={() => setView("preview")}
+        />
+      )}
       {view === "list" && (
         <DocumentListView
           onCreateClick={() => setView("templates")}
@@ -126,7 +136,11 @@ export function AiDocsApp() {
         />
       )}
       {view === "preview" && activeDocId && (
-        <DocumentPreviewView documentId={activeDocId} onDeleted={() => setView("list")} />
+        <DocumentPreviewView
+          documentId={activeDocId}
+          onDeleted={() => setView("list")}
+          onEditViaChat={() => setView("edit_chat")}
+        />
       )}
     </div>
   );
@@ -371,13 +385,23 @@ interface ChatMessage {
 
 function ChatView({
   initialMessage,
+  initialGreeting,
+  documentId,
   onDocumentCreated,
+  onDocumentEdited,
 }: {
   initialMessage?: string;
+  initialGreeting?: string;
+  documentId?: string;
   onDocumentCreated: (id: string) => void;
+  onDocumentEdited?: (id: string) => void;
 }) {
+  const qc = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "agent", text: "Опишите, какой документ нужен — я помогу собрать данные и создать его." },
+    {
+      role: "agent",
+      text: initialGreeting ?? "Опишите, какой документ нужен — я помогу собрать данные и создать его.",
+    },
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -400,13 +424,23 @@ function ChatView({
     setInput("");
     haptic("light");
     try {
-      const reply = await aidocsService.chat(trimmed, conversationId);
+      const reply = await aidocsService.chat(trimmed, conversationId, documentId);
       setConversationId(reply.conversation_id);
       setMessages((m) => [...m, { role: "agent", text: reply.reply }]);
       setQuickActions(reply.quick_actions || []);
       if (reply.document) {
         haptic("success");
         onDocumentCreated(reply.document.id);
+      }
+      if (reply.edited_document) {
+        haptic("success");
+        // Документ изменён через чат (п.1 промпта) — обновляем превью/
+        // историю версий, чтобы не показывать устаревший content_blocks.
+        // Экран НЕ переключаем автоматически — пользователь может захотеть
+        // внести ещё правки подряд, возврат к документу — по кнопке "Готово".
+        qc.invalidateQueries({ queryKey: ["aidocs", "document", reply.edited_document.id] });
+        qc.invalidateQueries({ queryKey: ["aidocs", "versions", reply.edited_document.id] });
+        qc.invalidateQueries({ queryKey: ["aidocs", "documents"] });
       }
     } catch (e) {
       haptic("error");
@@ -426,6 +460,13 @@ function ChatView({
 
   return (
     <div className="flex flex-col" style={{ height: "calc(100vh - 140px)" }}>
+      {documentId && onDocumentEdited && (
+        <div className="flex justify-end mb-2">
+          <button onClick={() => onDocumentEdited(documentId)} className="text-accent text-[12.5px] font-semibold">
+            Готово, вернуться к документу
+          </button>
+        </div>
+      )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col gap-2.5 pb-3">
         {messages.map((m, i) => (
           <div
@@ -656,7 +697,15 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
 
 /* ============================= PREVIEW ============================= */
 
-function DocumentPreviewView({ documentId, onDeleted }: { documentId: string; onDeleted: () => void }) {
+function DocumentPreviewView({
+  documentId,
+  onDeleted,
+  onEditViaChat,
+}: {
+  documentId: string;
+  onDeleted: () => void;
+  onEditViaChat: () => void;
+}) {
   const doc = useAiDocsDocument(documentId);
   const versions = useAiDocsVersions(documentId);
   const del = useDeleteAiDoc();
@@ -883,6 +932,12 @@ function DocumentPreviewView({ documentId, onDeleted }: { documentId: string; on
       </div>
 
       <div className="mt-2">
+        <button
+          onClick={onEditViaChat}
+          className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary text-[12.5px] font-semibold mb-2"
+        >
+          Изменить через чат
+        </button>
         <button
           onClick={handleAnalyze}
           disabled={analyze.isPending}
