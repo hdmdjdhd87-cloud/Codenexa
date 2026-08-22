@@ -95,6 +95,12 @@ export interface AiDocsAnalysis {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
+function newIdempotencyKey(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export const aidocsService = {
   status: () => apiRequest<{ ai_available: boolean }>("/api/v1/aidocs/status"),
   templates: () => apiRequest<AiDocsTemplate[]>("/api/v1/aidocs/templates"),
@@ -105,22 +111,34 @@ export const aidocsService = {
   restoreVersion: (id: string, versionId: string) =>
     apiRequest<{ document: AiDocsDocument; version: AiDocsVersion }>(
       `/api/v1/aidocs/documents/${id}/versions/${versionId}/restore`,
-      { method: "POST" }
+      { method: "POST", headers: { "Idempotency-Key": newIdempotencyKey() } }
     ),
   compareVersions: (id: string, fromVersionId: string, toVersionId: string) =>
     apiRequest<AiDocsVersionCompare>(
       `/api/v1/aidocs/documents/${id}/versions/compare?from=${fromVersionId}&to=${toVersionId}`
     ),
   create: (payload: { template_id: string; title: string; field_values: Record<string, string> }) =>
-    apiRequest<AiDocsDocument>("/api/v1/aidocs/documents", { method: "POST", body: payload }),
+    apiRequest<AiDocsDocument>("/api/v1/aidocs/documents", {
+      method: "POST",
+      body: payload,
+      headers: { "Idempotency-Key": newIdempotencyKey() },
+    }),
   remove: (id: string) => apiRequest<{ status: string }>(`/api/v1/aidocs/documents/${id}`, { method: "DELETE" }),
   setFavorite: (id: string, is_favorite: boolean) =>
     apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/favorite`, { method: "PATCH", body: { is_favorite } }),
   rename: (id: string, title: string) =>
     apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/rename`, { method: "PATCH", body: { title } }),
-  duplicate: (id: string) => apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/duplicate`, { method: "POST" }),
+  duplicate: (id: string) =>
+    apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}/duplicate`, {
+      method: "POST",
+      headers: { "Idempotency-Key": newIdempotencyKey() },
+    }),
   createShare: (id: string, expires_in_days: number | null) =>
-    apiRequest<AiDocsShare>(`/api/v1/aidocs/documents/${id}/share`, { method: "POST", body: { expires_in_days } }),
+    apiRequest<AiDocsShare>(`/api/v1/aidocs/documents/${id}/share`, {
+      method: "POST",
+      body: { expires_in_days },
+      headers: { "Idempotency-Key": newIdempotencyKey() },
+    }),
   listShares: (id: string) => apiRequest<AiDocsShare[]>(`/api/v1/aidocs/documents/${id}/shares`),
   revokeShare: (shareId: string) => apiRequest<{ status: string }>(`/api/v1/aidocs/shares/${shareId}`, { method: "DELETE" }),
   shareUrl: (token: string) => `${API_BASE_URL}/api/v1/aidocs/shared/${token}`,

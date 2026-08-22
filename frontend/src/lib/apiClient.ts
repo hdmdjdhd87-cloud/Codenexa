@@ -104,10 +104,12 @@ interface RequestOptions {
   body?: unknown;
   /** Публичные эндпоинты (например /health) не требуют токен */
   skipAuth?: boolean;
+  /** Дополнительные заголовки — например Idempotency-Key (п.7 промпта) */
+  headers?: Record<string, string>;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, skipAuth = false } = options;
+  const { method = "GET", body, skipAuth = false, headers: extraHeaders } = options;
 
   const doFetch = async (token: string | null): Promise<Response> => {
     const controller = new AbortController();
@@ -118,6 +120,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...extraHeaders,
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,

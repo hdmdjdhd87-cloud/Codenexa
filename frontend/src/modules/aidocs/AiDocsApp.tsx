@@ -635,6 +635,7 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [suggestedFields, setSuggestedFields] = useState<Record<string, string>>({});
   const create = useCreateAiDoc();
+  const submittingRef = useRef(false);
 
   function setField(key: string, value: string) {
     setValues((v) => ({ ...v, [key]: value }));
@@ -666,6 +667,11 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
   }
 
   async function handleSubmit() {
+    // Синхронный guard (useRef, не useState) — блокирует повторный вызов
+    // ДО следующего рендера, закрывая ту же гонку двойного тапа, которую
+    // одно только disabled на кнопке не успевает поймать (п.7 промпта).
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError(null);
     haptic("light");
     try {
@@ -679,6 +685,8 @@ function CreateDocumentView({ template, onCreated }: { template: AiDocsTemplate;
     } catch (e) {
       haptic("error");
       setError(e instanceof Error ? e.message : "Не удалось создать документ.");
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -796,6 +804,9 @@ function DocumentPreviewView({
   const restoreVersion = useRestoreAiDocVersion();
   const compareVersions = useCompareAiDocVersions();
   const analyze = useAnalyzeAiDoc();
+  const shareSubmittingRef = useRef(false);
+  const duplicateSubmittingRef = useRef(false);
+  const restoreSubmittingRef = useRef(false);
   const [downloading, setDownloading] = useState<"docx" | "pdf" | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -817,12 +828,15 @@ function DocumentPreviewView({
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   async function handleRestore(versionId: string) {
+    if (restoreSubmittingRef.current) return;
+    restoreSubmittingRef.current = true;
     setRestoreError(null);
     haptic("light");
     try {
-      // Идемпотентность: пока запрос летит, restoreVersion.isPending уже
-      // блокирует повторный клик на кнопке (см. disabled ниже) — двойной
-      // клик не породит два новых восстановления подряд.
+      // Двойная защита от повторного клика (п.7 промпта): синхронный ref
+      // (эта проверка) закрывает гонку до перерисовки, disabled на кнопке —
+      // видимую блокировку, а Idempotency-Key в aidocsService.restoreVersion —
+      // защиту на уровне бэкенда, если оба клиентских барьера не сработали.
       const result = await restoreVersion.mutateAsync({ id: documentId, versionId });
       setRestoreNotice(`Восстановлена версия ${result.version.version_number}.`);
       setRestoringVersionId(null);
@@ -831,6 +845,8 @@ function DocumentPreviewView({
     } catch (e) {
       setRestoreError(e instanceof Error ? e.message : "Не удалось восстановить версию.");
       haptic("error");
+    } finally {
+      restoreSubmittingRef.current = false;
     }
   }
 
@@ -881,6 +897,8 @@ function DocumentPreviewView({
   }
 
   async function handleShare(expiresInDays: number | null) {
+    if (shareSubmittingRef.current) return;
+    shareSubmittingRef.current = true;
     setShareError(null);
     setShareLoading(true);
     haptic("light");
@@ -891,13 +909,20 @@ function DocumentPreviewView({
       setShareError(e instanceof Error ? e.message : "Не удалось создать ссылку.");
     } finally {
       setShareLoading(false);
+      shareSubmittingRef.current = false;
     }
   }
 
   async function handleDuplicate() {
+    if (duplicateSubmittingRef.current) return;
+    duplicateSubmittingRef.current = true;
     haptic("light");
-    const copy = await duplicate.mutateAsync(documentId);
-    setDuplicateNotice(`Создана копия: «${copy.title}» — она в списке «Мои документы».`);
+    try {
+      const copy = await duplicate.mutateAsync(documentId);
+      setDuplicateNotice(`Создана копия: «${copy.title}» — она в списке «Мои документы».`);
+    } finally {
+      duplicateSubmittingRef.current = false;
+    }
   }
 
   async function handleExport(format: "docx" | "pdf") {

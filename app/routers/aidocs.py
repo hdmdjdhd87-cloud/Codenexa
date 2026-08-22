@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, UploadFile, File, Form, Query, HTTPException
+from fastapi import APIRouter, Depends, Header, Response, UploadFile, File, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.auth.middleware import get_current_user_id
 from app.repositories import aidocs_repository as repo
 from app.repositories.history_repository import add_history_event
+from app.repositories.idempotency import with_idempotency
 from app.document_engine.template_fill import fill_template, validate_required_fields
 from app.document_engine.docx_renderer import render_docx
 from app.document_engine.pdf_renderer import render_pdf
@@ -49,7 +50,11 @@ class CreateDocumentRequest(BaseModel):
 
 
 @router.post("/documents")
-async def create_document(payload: CreateDocumentRequest, user_id: str = Depends(get_current_user_id)) -> dict:
+async def create_document(
+    payload: CreateDocumentRequest,
+    user_id: str = Depends(get_current_user_id),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
     template = await repo.get_template(payload.template_id)
     if not template:
         raise api_error(status.HTTP_404_NOT_FOUND, "TEMPLATE_NOT_FOUND", "Шаблон не найден.")
@@ -62,12 +67,20 @@ async def create_document(payload: CreateDocumentRequest, user_id: str = Depends
             f"Не заполнены обязательные поля: {', '.join(missing)}.",
         )
 
-    content_blocks = fill_template(template["body_template"], payload.field_values)
-    doc = await repo.create_document(
-        user_id, template["id"], payload.title, template["category"], payload.field_values, content_blocks
-    )
-    await add_history_event(user_id, "document_create", metadata={"document_id": str(doc["id"]), "title": doc["title"]})
-    return doc
+    async def _work() -> dict:
+        content_blocks = fill_template(template["body_template"], payload.field_values)
+        doc = await repo.create_document(
+            user_id, template["id"], payload.title, template["category"], payload.field_values, content_blocks
+        )
+        await add_history_event(
+            user_id, "document_create", metadata={"document_id": str(doc["id"]), "title": doc["title"]}
+        )
+        return doc
+
+    # Идемпотентность (п.7 промпта): двойной клик "Создать документ" с
+    # тем же Idempotency-Key вернёт УЖЕ созданный документ, а не создаст
+    # второй дубликат.
+    return await with_idempotency(user_id, "create_document", idempotency_key, _work)
 
 
 @router.get("/documents")
@@ -112,21 +125,32 @@ async def get_versions(document_id: str, user_id: str = Depends(get_current_user
 
 
 @router.post("/documents/{document_id}/versions/{version_id}/restore")
-async def restore_version(document_id: str, version_id: str, user_id: str = Depends(get_current_user_id)) -> dict:
+async def restore_version(
+    document_id: str,
+    version_id: str,
+    user_id: str = Depends(get_current_user_id),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
     """
     Восстановление версии (п.2 промпта). Создаёт НОВУЮ версию поверх
     существующей истории (не удаляет и не переписывает старые версии) —
     см. docstring repo.restore_version.
     """
-    result = await repo.restore_version(user_id, document_id, version_id)
-    if not result:
-        raise api_error(status.HTTP_404_NOT_FOUND, "VERSION_NOT_FOUND", "Версия или документ не найдены.")
-    await add_history_event(
-        user_id,
-        "document_version_restore",
-        metadata={"document_id": document_id, "restored_from_version_id": version_id},
-    )
-    return {"document": result["document"], "version": result["version"]}
+
+    async def _work() -> dict:
+        result = await repo.restore_version(user_id, document_id, version_id)
+        if not result:
+            raise api_error(status.HTTP_404_NOT_FOUND, "VERSION_NOT_FOUND", "Версия или документ не найдены.")
+        await add_history_event(
+            user_id,
+            "document_version_restore",
+            metadata={"document_id": document_id, "restored_from_version_id": version_id},
+        )
+        return {"document": result["document"], "version": result["version"]}
+
+    # Идемпотентность (п.7 промпта): двойной клик "Восстановить" с тем
+    # же Idempotency-Key не создаст две одинаковые restored-версии подряд.
+    return await with_idempotency(user_id, "restore_version", idempotency_key, _work)
 
 
 @router.get("/documents/{document_id}/versions/compare")
@@ -244,12 +268,19 @@ async def rename_document(document_id: str, payload: RenameRequest, user_id: str
 
 
 @router.post("/documents/{document_id}/duplicate")
-async def duplicate_document(document_id: str, user_id: str = Depends(get_current_user_id)) -> dict:
-    doc = await repo.duplicate_document(user_id, document_id)
-    if not doc:
-        raise api_error(status.HTTP_404_NOT_FOUND, "DOCUMENT_NOT_FOUND", "Документ не найден.")
-    await add_history_event(user_id, "document_duplicate", metadata={"document_id": str(doc["id"])})
-    return doc
+async def duplicate_document(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
+    async def _work() -> dict:
+        doc = await repo.duplicate_document(user_id, document_id)
+        if not doc:
+            raise api_error(status.HTTP_404_NOT_FOUND, "DOCUMENT_NOT_FOUND", "Документ не найден.")
+        await add_history_event(user_id, "document_duplicate", metadata={"document_id": str(doc["id"])})
+        return doc
+
+    return await with_idempotency(user_id, "duplicate_document", idempotency_key, _work)
 
 
 class ShareRequest(BaseModel):
@@ -257,12 +288,22 @@ class ShareRequest(BaseModel):
 
 
 @router.post("/documents/{document_id}/share")
-async def create_share(document_id: str, payload: ShareRequest, user_id: str = Depends(get_current_user_id)) -> dict:
-    share = await repo.create_share_link(user_id, document_id, payload.expires_in_days)
-    if not share:
-        raise api_error(status.HTTP_404_NOT_FOUND, "DOCUMENT_NOT_FOUND", "Документ не найден.")
-    await add_history_event(user_id, "document_share_create", metadata={"document_id": document_id})
-    return share
+async def create_share(
+    document_id: str,
+    payload: ShareRequest,
+    user_id: str = Depends(get_current_user_id),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
+    async def _work() -> dict:
+        share = await repo.create_share_link(user_id, document_id, payload.expires_in_days)
+        if not share:
+            raise api_error(status.HTTP_404_NOT_FOUND, "DOCUMENT_NOT_FOUND", "Документ не найден.")
+        await add_history_event(user_id, "document_share_create", metadata={"document_id": document_id})
+        return share
+
+    # Идемпотентность (п.7 промпта): двойной клик "Поделиться" с тем же
+    # Idempotency-Key не наплодит несколько активных публичных ссылок.
+    return await with_idempotency(user_id, "create_share", idempotency_key, _work)
 
 
 @router.get("/documents/{document_id}/shares")
