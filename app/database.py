@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Optional
+from urllib.parse import urlparse
 
 import asyncpg
 
@@ -18,6 +20,46 @@ from app.config import get_settings
 logger = logging.getLogger("codenexa.database")
 
 _pool: Optional[asyncpg.Pool] = None
+
+
+def extract_supabase_project_ref(database_url: str) -> Optional[str]:
+    """
+    Достаёт Supabase project ref из Postgres DSN — из хоста
+    (db.<ref>.supabase.co, прямое подключение :5432) или из имени
+    пользователя (postgres.<ref>, подключение через Supavisor pooler
+    :6543 — судя по комментариям ниже, именно так проект и настроен).
+    Возвращает None, если DSN не похож на Supabase (например, локальная
+    БД в разработке) — тогда safety-проверка ниже просто не применяется,
+    а не падает вслепую.
+    """
+    if not database_url:
+        return None
+    try:
+        parsed = urlparse(database_url)
+    except ValueError:
+        return None
+
+    host = parsed.hostname or ""
+    match = re.match(r"^db\.([a-z0-9]+)\.supabase\.co$", host)
+    if match:
+        return match.group(1)
+
+    username = parsed.username or ""
+    match = re.match(r"^postgres\.([a-z0-9]+)$", username)
+    if match:
+        return match.group(1)
+
+    return None
+
+
+def _safe_fingerprint(project_ref: Optional[str]) -> str:
+    """Для логов — НИКОГДА не пишем полный DSN (там пароль!) или сырой
+    ref целиком, только короткий фингерпринт для сверки на глаз."""
+    if not project_ref:
+        return "unknown/non-supabase"
+    if len(project_ref) <= 8:
+        return project_ref
+    return f"{project_ref[:4]}…{project_ref[-4:]}"
 
 
 async def _init_connection(conn: asyncpg.Connection) -> None:
@@ -41,6 +83,27 @@ async def connect() -> None:
             "Эндпоинты, требующие базу, будут возвращать 503."
         )
         return
+
+    project_ref = extract_supabase_project_ref(settings.database_url)
+    logger.info("Подключение к БД — Supabase project fingerprint: %s", _safe_fingerprint(project_ref))
+
+    # SEC-002 (production-аудит 22.08.2026): README/.env.example раньше
+    # указывали project ref, отличающийся от реально используемого, и
+    # никакой автоматической проверки при этом не было — рассинхрон
+    # обнаружился бы только по факту (не те данные читаются/пишутся).
+    # Fail-fast вместо этого: если ops явно задал EXPECTED_DB_PROJECT_REF,
+    # а реальный DATABASE_URL на него не похож — падаем на старте, а не
+    # тихо продолжаем работать не с той БД (перепутанные production/
+    # staging окружения). Без этой переменной проверка не блокирует
+    # существующие деплои.
+    if settings.expected_db_project_ref and project_ref and settings.expected_db_project_ref != project_ref:
+        raise RuntimeError(
+            "КРИТИЧНО: DATABASE_URL указывает на другой Supabase project, чем ожидалось "
+            f"(EXPECTED_DB_PROJECT_REF={_safe_fingerprint(settings.expected_db_project_ref)}, "
+            f"фактически={_safe_fingerprint(project_ref)}). Похоже на перепутанное "
+            "production/staging окружение. Подключение отклонено — проверьте DATABASE_URL."
+        )
+
     try:
         _pool = await asyncpg.create_pool(
             dsn=settings.database_url,

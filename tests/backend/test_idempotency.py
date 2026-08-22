@@ -3,7 +3,41 @@ import uuid
 
 import pytest
 
-from app.repositories.idempotency import _json_safe, with_idempotency
+from app.repositories.idempotency import _json_safe, compute_request_hash, with_idempotency
+
+
+# ---------- compute_request_hash ----------
+
+def test_compute_request_hash_is_deterministic():
+    h1 = compute_request_hash("doc-1", "v-2")
+    h2 = compute_request_hash("doc-1", "v-2")
+    assert h1 == h2
+
+
+def test_compute_request_hash_differs_for_different_params():
+    h1 = compute_request_hash("doc-1", "v-2")
+    h2 = compute_request_hash("doc-1", "v-3")
+    assert h1 != h2
+
+
+def test_compute_request_hash_differs_for_different_order():
+    # порядок значим — это защита от переиспользования ключа с другими
+    # (пусть и теми же по набору) параметрами
+    h1 = compute_request_hash("a", "b")
+    h2 = compute_request_hash("b", "a")
+    assert h1 != h2
+
+
+def test_compute_request_hash_handles_dict_payload():
+    h = compute_request_hash("tpl-1", "Договор", {"customer": "Иванов", "price": "100000"})
+    assert isinstance(h, str)
+    assert len(h) == 64  # sha256 hex digest
+
+
+def test_compute_request_hash_sensitive_to_dict_contents():
+    h1 = compute_request_hash("tpl-1", "Договор", {"customer": "Иванов"})
+    h2 = compute_request_hash("tpl-1", "Договор", {"customer": "Петров"})
+    assert h1 != h2
 
 
 # ---------- _json_safe ----------
@@ -74,3 +108,27 @@ async def test_with_idempotency_without_key_calls_work_fn_every_time():
     # без ключа защиты нет — это ожидаемо и задокументировано в модуле
     assert first != second
     assert len(calls) == 2
+
+
+# ---------- NOT VERIFIED (требует реальный Postgres) ----------
+#
+# Честно, по требованию production-аудита (22.08.2026): следующие
+# сценарии из state machine (_claim в idempotency.py) НЕ покрыты
+# юнит-тестами в этом файле, потому что они требуют реальных SQL-эффектов
+# (ON CONFLICT, FOR UPDATE, транзакции, now()/lease) — их нельзя честно
+# проверить без подключения к Postgres:
+#
+#   - два конкурентных запроса с одним ключом: только один получает
+#     'claimed', второй — 409 REQUEST_IN_PROGRESS
+#   - work_fn() бросает исключение -> состояние становится 'failed',
+#     повторный запрос с тем же ключом может попробовать снова (а не
+#     залипает в 409 навсегда — это и есть исправление SEC-003/F-003)
+#   - лиз истёк (процесс убит посреди work_fn) -> следующий запрос
+#     перехватывает работу заново
+#   - одинаковый ключ, другой request_hash -> 422 IDEMPOTENCY_KEY_REUSED
+#   - state='completed' -> response_body возвращается БЕЗ повторного
+#     вызова work_fn
+#
+# Эти сценарии нужно проверить integration-тестами против реального
+# Postgres (например тестовая БД в CI) — см. migrations/0009 и
+# MANUAL_TODO.md.

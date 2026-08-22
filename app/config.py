@@ -26,8 +26,27 @@ class Settings(BaseSettings):
     jwt_expires_minutes: int = 60 * 12  # 12 часов
 
     # --- Supabase (если нужен прямой REST/Storage доступ) ---
-    supabase_url: str = "https://vlpgdiivliozzhacymaw.supabase.co"
+    # ВНИМАНИЕ: это поле сейчас НИГДЕ в коде не используется для
+    # реального подключения — фактическая связь с БД идёт через
+    # database_url (см. app/database.py). Значение по умолчанию было
+    # обнаружено production-аудитом (22.08.2026) как устаревшее/не
+    # совпадающее с реально используемым Supabase project ref — намеренно
+    # оставляю поле ПУСТЫМ по умолчанию, а не подставляю какой-либо
+    # project ref "по памяти" без возможности это проверить из песочницы.
+    # См. SEC-002 в аудите и expected_db_project_ref ниже — реальная
+    # защита от "пишем не в ту БД" реализована через сверку project ref
+    # из DATABASE_URL, а не через это поле.
+    supabase_url: str = ""
     supabase_service_role_key: str = ""  # ТОЛЬКО backend, никогда не в frontend
+
+    # --- Safety-проверка при старте (SEC-002 из аудита 22.08.2026):
+    # если задано, database.connect() сверяет project ref, извлечённый
+    # из DATABASE_URL, с этим значением и падает при несовпадении —
+    # чтобы приложение не могло молча начать работать не с той БД
+    # (перепутанные production/staging окружения). Пусто по умолчанию —
+    # проверка не блокирует существующие деплои, пока ops явно не
+    # укажет ожидаемый ref.
+    expected_db_project_ref: str = ""
 
     # --- AI Docs: провайдер LLM (см. app/ai/provider.py) ---
     # Пока не заполнены — AI Docs работает в fallback-режиме без

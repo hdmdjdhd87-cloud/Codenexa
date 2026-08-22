@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.auth.middleware import get_current_user_id
 from app.repositories import aidocs_repository as repo
 from app.repositories.history_repository import add_history_event
-from app.repositories.idempotency import with_idempotency
+from app.repositories.idempotency import with_idempotency, compute_request_hash
 from app.document_engine.template_fill import fill_template, validate_required_fields
 from app.document_engine.docx_renderer import render_docx
 from app.document_engine.pdf_renderer import render_pdf
@@ -79,8 +79,13 @@ async def create_document(
 
     # Идемпотентность (п.7 промпта): двойной клик "Создать документ" с
     # тем же Idempotency-Key вернёт УЖЕ созданный документ, а не создаст
-    # второй дубликат.
-    return await with_idempotency(user_id, "create_document", idempotency_key, _work)
+    # второй дубликат. request_hash защищает от обратного случая — если
+    # клиент по ошибке переиспользует ключ для ДРУГОГО документа/полей,
+    # это 422, а не тихая подмена результата (найдено при повторной
+    # проверке аудита: document_id/version_id часто приходят из URL, а
+    # не из тела, и не входили в защиту раньше).
+    request_hash = compute_request_hash(payload.template_id, payload.title, payload.field_values)
+    return await with_idempotency(user_id, "create_document", idempotency_key, _work, request_hash=request_hash)
 
 
 @router.get("/documents")
@@ -150,7 +155,11 @@ async def restore_version(
 
     # Идемпотентность (п.7 промпта): двойной клик "Восстановить" с тем
     # же Idempotency-Key не создаст две одинаковые restored-версии подряд.
-    return await with_idempotency(user_id, "restore_version", idempotency_key, _work)
+    # request_hash включает document_id+version_id (пришедшие из URL) —
+    # переиспользование того же ключа для ДРУГОЙ версии/документа даёт
+    # 422, а не результат первого запроса.
+    request_hash = compute_request_hash(document_id, version_id)
+    return await with_idempotency(user_id, "restore_version", idempotency_key, _work, request_hash=request_hash)
 
 
 @router.get("/documents/{document_id}/versions/compare")
@@ -280,7 +289,9 @@ async def duplicate_document(
         await add_history_event(user_id, "document_duplicate", metadata={"document_id": str(doc["id"])})
         return doc
 
-    return await with_idempotency(user_id, "duplicate_document", idempotency_key, _work)
+    return await with_idempotency(
+        user_id, "duplicate_document", idempotency_key, _work, request_hash=compute_request_hash(document_id)
+    )
 
 
 class ShareRequest(BaseModel):
@@ -303,7 +314,10 @@ async def create_share(
 
     # Идемпотентность (п.7 промпта): двойной клик "Поделиться" с тем же
     # Idempotency-Key не наплодит несколько активных публичных ссылок.
-    return await with_idempotency(user_id, "create_share", idempotency_key, _work)
+    # request_hash = document_id (из URL) + срок действия — та же защита
+    # от переиспользования ключа для другого документа.
+    request_hash = compute_request_hash(document_id, payload.expires_in_days)
+    return await with_idempotency(user_id, "create_share", idempotency_key, _work, request_hash=request_hash)
 
 
 @router.get("/documents/{document_id}/shares")
