@@ -4,12 +4,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { hideBackButton, showBackButton, haptic } from "@/lib/telegram";
 import { downloadAuthorizedFile } from "@/lib/apiClient";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { aidocsService, type AiDocsTemplate, type AiDocsAnalysis, type AiDocsVersionCompare } from "@/services/aidocsService";
+import { aidocsService, type AiDocsTemplate, type AiDocsAnalysis, type AiDocsVersionCompare, type AiDocsConversation } from "@/services/aidocsService";
 import {
   useAiDocsTemplates,
   useAiDocsDocuments,
   useAiDocsDocument,
   useAiDocsVersions,
+  useAiDocsActiveConversation,
   useCreateAiDoc,
   useDeleteAiDoc,
   useToggleAiDocFavorite,
@@ -55,6 +56,7 @@ export function AiDocsApp() {
   const [selectedTemplate, setSelectedTemplate] = useState<AiDocsTemplate | null>(null);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>(undefined);
+  const [resumeConversation, setResumeConversation] = useState<AiDocsConversation | null>(null);
 
   // Telegram BackButton: внутри модуля сначала возвращаемся на предыдущий
   // экран, и только с самой Главной AI Docs — обратно в каталог CodeNexa.
@@ -84,6 +86,12 @@ export function AiDocsApp() {
           onOpenTemplates={() => setView("templates")}
           onOpenChat={(msg) => {
             setChatInitialMessage(msg);
+            setResumeConversation(null);
+            setView("chat");
+          }}
+          onResumeChat={(conv) => {
+            setChatInitialMessage(undefined);
+            setResumeConversation(conv);
             setView("chat");
           }}
           onOpen={(id) => {
@@ -95,6 +103,7 @@ export function AiDocsApp() {
       {view === "chat" && (
         <ChatView
           initialMessage={chatInitialMessage}
+          resumeConversation={resumeConversation}
           onDocumentCreated={(id) => {
             setActiveDocId(id);
             setView("preview");
@@ -152,22 +161,61 @@ function AiDocsHomeView({
   onOpenList,
   onOpenTemplates,
   onOpenChat,
+  onResumeChat,
   onOpen,
 }: {
   onOpenList: () => void;
   onOpenTemplates: () => void;
   onOpenChat: (initialMessage?: string) => void;
+  onResumeChat: (conversation: AiDocsConversation) => void;
   onOpen: (id: string) => void;
 }) {
   const documents = useAiDocsDocuments();
+  const activeConversation = useAiDocsActiveConversation();
   const [quickInput, setQuickInput] = useState("");
+  const [draftDismissed, setDraftDismissed] = useState(false);
 
   const total = documents.data?.length ?? 0;
   const favoritesCount = (documents.data ?? []).filter((d) => d.is_favorite).length;
   const lastDoc = (documents.data ?? [])[0]; // список уже отсортирован backend'ом по updated_at desc
 
+  // Незавершённый диалог создания документа (п.6 промпта): backend уже
+  // хранит состояние (nexa_docs_conversations), но раньше фронтенд его
+  // никак не проверял при открытии AI Docs — черновик молча пропадал
+  // из виду при закрытии Mini App. status "idle" без сообщений — это
+  // просто пустая ещё не начатая беседа, не черновик, банер не нужен.
+  const draft = activeConversation.data;
+  const hasDraft =
+    !!draft &&
+    !draftDismissed &&
+    (draft.status === "collecting" || draft.status === "ready_to_create") &&
+    (draft.messages?.length ?? 0) > 0;
+
   return (
     <div>
+      {hasDraft && draft && (
+        <div className="rounded-2xl bg-accent/10 border border-accent/30 p-3.5 mb-4">
+          <p className="text-text-primary text-[13px] font-semibold mb-1">Продолжить создание документа?</p>
+          <p className="text-text-secondary text-[12px] mb-2.5 line-clamp-2">
+            {draft.messages[draft.messages.length - 1]?.text || "У вас есть незавершённый диалог."}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onResumeChat(draft)}
+              className="flex-1 py-2 rounded-lg bg-accent text-white text-[12.5px] font-semibold"
+            >
+              Продолжить
+            </button>
+            <button
+              onClick={() => setDraftDismissed(true)}
+              className="flex-1 py-2 rounded-lg bg-surface border border-border text-text-primary text-[12.5px] font-semibold"
+            >
+              Не сейчас
+            </button>
+          </div>
+        </div>
+      )}
+
       <p className="text-text-secondary text-[13px] mb-4">
         Создавайте и оформляйте документы — опишите задачу своими словами.
       </p>
@@ -387,26 +435,32 @@ function ChatView({
   initialMessage,
   initialGreeting,
   documentId,
+  resumeConversation,
   onDocumentCreated,
   onDocumentEdited,
 }: {
   initialMessage?: string;
   initialGreeting?: string;
   documentId?: string;
+  resumeConversation?: AiDocsConversation | null;
   onDocumentCreated: (id: string) => void;
   onDocumentEdited?: (id: string) => void;
 }) {
   const qc = useQueryClient();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "agent",
-      text: initialGreeting ?? "Опишите, какой документ нужен — я помогу собрать данные и создать его.",
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    resumeConversation && resumeConversation.messages.length > 0
+      ? resumeConversation.messages.map((m) => ({ role: m.role, text: m.text }))
+      : [
+          {
+            role: "agent",
+            text: initialGreeting ?? "Опишите, какой документ нужен — я помогу собрать данные и создать его.",
+          },
+        ]
+  );
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [conversationId, setConversationId] = useState<string | undefined>(resumeConversation?.id);
   const [quickActions, setQuickActions] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentInitial = useRef(false);

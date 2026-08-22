@@ -24,6 +24,16 @@ export function useAiDocsDocument(id: string | null) {
   });
 }
 
+export function useAiDocsActiveConversation() {
+  return useQuery({
+    queryKey: ["aidocs", "active-conversation"],
+    queryFn: () => aidocsService.activeConversation(),
+    // Не троттлим агрессивно — это лёгкий GET, а актуальность (есть ли
+    // черновик прямо сейчас) важнее кеша.
+    staleTime: 0,
+  });
+}
+
 export function useAiDocsVersions(id: string | null) {
   return useQuery({
     queryKey: ["aidocs", "versions", id],
