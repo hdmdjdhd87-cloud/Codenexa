@@ -62,6 +62,36 @@ export interface AiDocsShare {
   created_at: string;
 }
 
+export interface AiDocsWordDiffPart {
+  op: "equal" | "insert" | "delete";
+  text: string;
+}
+
+export interface AiDocsBlockDiff {
+  op: "added" | "removed" | "unchanged" | "changed";
+  type: string;
+  old_text: string | null;
+  new_text: string | null;
+  old_index: number | null;
+  new_index: number | null;
+  word_diff: AiDocsWordDiffPart[];
+}
+
+export interface AiDocsVersionCompare {
+  from: { version_number: number; created_at: string };
+  to: { version_number: number; created_at: string };
+  diff: {
+    summary: { added: number; removed: number; changed: number; unchanged: number };
+    blocks: AiDocsBlockDiff[];
+  };
+}
+
+export interface AiDocsAnalysis {
+  status: "pass" | "warning" | "error";
+  disclaimer: string;
+  issues: { severity: "error" | "warning" | "info"; category: string; message: string; suggestion: string | null }[];
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export const aidocsService = {
@@ -71,6 +101,15 @@ export const aidocsService = {
     apiRequest<AiDocsDocument[]>(`/api/v1/aidocs/documents${search ? `?search=${encodeURIComponent(search)}` : ""}`),
   document: (id: string) => apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}`),
   versions: (id: string) => apiRequest<AiDocsVersion[]>(`/api/v1/aidocs/documents/${id}/versions`),
+  restoreVersion: (id: string, versionId: string) =>
+    apiRequest<{ document: AiDocsDocument; version: AiDocsVersion }>(
+      `/api/v1/aidocs/documents/${id}/versions/${versionId}/restore`,
+      { method: "POST" }
+    ),
+  compareVersions: (id: string, fromVersionId: string, toVersionId: string) =>
+    apiRequest<AiDocsVersionCompare>(
+      `/api/v1/aidocs/documents/${id}/versions/compare?from=${fromVersionId}&to=${toVersionId}`
+    ),
   create: (payload: { template_id: string; title: string; field_values: Record<string, string> }) =>
     apiRequest<AiDocsDocument>("/api/v1/aidocs/documents", { method: "POST", body: payload }),
   remove: (id: string) => apiRequest<{ status: string }>(`/api/v1/aidocs/documents/${id}`, { method: "DELETE" }),
@@ -88,11 +127,7 @@ export const aidocsService = {
   chat: (message: string, conversation_id?: string) =>
     apiRequest<AiDocsChatReply>("/api/v1/aidocs/chat", { method: "POST", body: { message, conversation_id } }),
   activeConversation: () => apiRequest<AiDocsConversation>("/api/v1/aidocs/conversations/active/current"),
-  analyze: (id: string) =>
-    apiRequest<{ status: string; disclaimer: string; issues: { severity: string; category: string; message: string; suggestion: string | null }[] }>(
-      `/api/v1/aidocs/documents/${id}/analyze`,
-      { method: "POST" }
-    ),
+  analyze: (id: string) => apiRequest<AiDocsAnalysis>(`/api/v1/aidocs/documents/${id}/analyze`, { method: "POST" }),
   async ocr(file: File): Promise<{ text: string; structural_understanding_available: boolean }> {
     const { getStoredToken } = await import("@/lib/tokenStorage");
     const token = getStoredToken();

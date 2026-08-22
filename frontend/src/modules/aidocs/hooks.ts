@@ -32,6 +32,31 @@ export function useAiDocsVersions(id: string | null) {
   });
 }
 
+export function useRestoreAiDocVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, versionId }: { id: string; versionId: string }) => aidocsService.restoreVersion(id, versionId),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["aidocs", "document", vars.id] });
+      qc.invalidateQueries({ queryKey: ["aidocs", "versions", vars.id] });
+      qc.invalidateQueries({ queryKey: ["aidocs", "documents"] });
+    },
+  });
+}
+
+export function useCompareAiDocVersions() {
+  return useMutation({
+    mutationFn: ({ id, fromVersionId, toVersionId }: { id: string; fromVersionId: string; toVersionId: string }) =>
+      aidocsService.compareVersions(id, fromVersionId, toVersionId),
+  });
+}
+
+export function useAnalyzeAiDoc() {
+  return useMutation({
+    mutationFn: (id: string) => aidocsService.analyze(id),
+  });
+}
+
 export function useCreateAiDoc() {
   const qc = useQueryClient();
   return useMutation({
