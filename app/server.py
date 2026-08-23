@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import connect, disconnect
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.routers import auth, favorites, health, history, modules, notifications, projects, settings as settings_router, users, aidocs
 
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,15 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="CodeNexa System API", version="1.0.0", lifespan=lifespan)
 
+    app.add_middleware(
+        RateLimitMiddleware,
+    )
+
+    # ВАЖНО: порядок add_middleware в Starlette обратный — последний
+    # добавленный оборачивает предыдущие (выполняется первым на входе,
+    # последним на выходе). CORS должен быть снаружи RateLimitMiddleware,
+    # иначе браузер не увидит CORS-заголовков на 429-ответе от лимитера
+    # и покажет невнятную CORS-ошибку вместо настоящего RATE_LIMITED.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
