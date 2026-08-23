@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.database import connect, disconnect
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.routers import auth, favorites, health, history, modules, notifications, projects, settings as settings_router, users, aidocs
+from app.routers import auth, favorites, health, history, modules, notifications, projects, settings as settings_router, users, aidocs, admin
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("codenexa")
@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(projects.router)
     app.include_router(aidocs.router)
     app.include_router(aidocs.public_router)
+    app.include_router(admin.router)
 
     return app
 
