@@ -10,6 +10,7 @@ import { NotificationsPage } from "@/features/notifications/NotificationsPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { ModuleRoutePage } from "@/features/moduleRoute/ModuleRoutePage";
+import { AdminPage } from "@/features/admin/AdminPage";
 import { useSettings } from "@/hooks/useSettings";
 import { useApplyTheme } from "@/hooks/useApplyTheme";
 
@@ -34,6 +35,7 @@ function AppShell() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/apps/:moduleKey" element={<ModuleRoutePage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
       <BottomNav />
     </div>

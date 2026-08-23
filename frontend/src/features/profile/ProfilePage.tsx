@@ -5,6 +5,8 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useModules } from "@/hooks/useModules";
 import { useHistory } from "@/hooks/useHistory";
+import { useQuery } from "@tanstack/react-query";
+import { adminService } from "@/services/adminService";
 import { ProfileHeaderSkeleton } from "@/components/states/Skeleton";
 import { ErrorState } from "@/components/states/ErrorState";
 import { Avatar } from "@/components/Avatar";
@@ -21,6 +23,10 @@ export function ProfilePage() {
   const modules = useModules();
   const history = useHistory();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+  // Тихая проверка: не 403-страница "нет доступа" для обычных
+  // пользователей — ссылка на админку просто не существует для них,
+  // они не должны знать, что admin-функциональность вообще есть.
+  const adminMe = useQuery({ queryKey: ["admin", "me"], queryFn: () => adminService.me(), retry: false });
 
   if (user.isLoading) {
     return (
@@ -100,6 +106,7 @@ export function ProfilePage() {
       <SectionLabel>Система</SectionLabel>
       <div className="rounded-2xl bg-surface border border-border divide-y divide-border overflow-hidden">
         <LinkRow to="/settings" label={t("settings.title")} />
+        {adminMe.data?.is_admin && <LinkRow to="/admin" label="Админ-панель" />}
         {!confirmingLogout ? (
           <button
             onClick={() => setConfirmingLogout(true)}
