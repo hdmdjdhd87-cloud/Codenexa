@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -13,6 +14,28 @@ async def _pool_or_503():
     if pool is None:
         raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, "DATABASE_UNAVAILABLE", "База данных временно недоступна.")
     return pool
+
+
+def _build_prefix_tsquery(search_text: str) -> str | None:
+    """
+    Токенизирует произвольный пользовательский текст в безопасный
+    prefix-tsquery ('слово1:* & слово2:*') для to_tsquery() (F-017 из
+    аудита 22.08.2026 — full-text search вместо ILIKE по jsonb::text).
+
+    НЕ передаём сырой пользовательский текст напрямую в to_tsquery():
+    его синтаксис понимает спецсимволы & | ! ( ) ' как операторы, и
+    невалидный ввод ("foo &" или "((") уронил бы запрос с ошибкой
+    парсинга tsquery прямо в БД. \\w+ вырезает только словесные токены —
+    любые операторные символы просто отбрасываются, а не экранируются
+    и не долетают до SQL, так что синтаксическая ошибка невозможна.
+    ':*' — суффикс префиксного поиска, сохраняет ту же UX-привычку,
+    что была у ILIKE '%...%' (можно искать по началу слова, не вводя
+    его целиком).
+    """
+    words = re.findall(r"\w+", search_text, re.UNICODE)
+    if not words:
+        return None
+    return " & ".join(f"{w}:*" for w in words)
 
 
 async def list_templates() -> list[dict]:
@@ -54,21 +77,29 @@ async def list_documents(user_id: str, search: str | None = None) -> list[dict]:
     pool = await _pool_or_503()
     async with pool.acquire() as conn:
         if search and search.strip():
-            # Поиск по названию и по тексту документа (content_blocks -> text),
-            # без внешних full-text-индексов — достаточно для объёма одного пользователя.
+            prefix_query = _build_prefix_tsquery(search)
+            if not prefix_query:
+                # Пользователь что-то ввёл (непустая строка), но она не
+                # содержит ни одного словесного токена (только пунктуация/
+                # пробелы) — честно "ничего не найдено", а НЕ "фильтр не
+                # применяем и отдаём все документы". Без этой явной ветки
+                # пустой prefix_query провалился бы в общий case ниже.
+                return []
+            # search_text — STORED generated tsvector-колонка с GIN-индексом
+            # (migrations/0015_ai_docs_fts.sql), покрывает и title, и текст
+            # внутри content_blocks в одном индексируемом поле — вместо
+            # прежнего `content_blocks::text ilike '%...%'` (full scan без
+            # индекса при любом объёме документов).
             rows = await conn.fetch(
                 """
                 select id, title, doc_type, is_favorite, created_at, updated_at
                 from nexa_docs_documents
                 where user_id = $1
-                  and (
-                    title ilike '%' || $2 || '%'
-                    or content_blocks::text ilike '%' || $2 || '%'
-                  )
-                order by updated_at desc
+                  and search_text @@ to_tsquery('russian', $2)
+                order by ts_rank(search_text, to_tsquery('russian', $2)) desc, updated_at desc
                 """,
                 user_id,
-                search.strip(),
+                prefix_query,
             )
         else:
             rows = await conn.fetch(
