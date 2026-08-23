@@ -142,8 +142,6 @@ admin_audit_log` (`migrations/0013_admin_rbac.sql`), не хардкодит adm
   resolution, admin router через TestClient) — все проходят.
 
 **Осталось (не блокирует прод, но не готово):**
-- **Admin panel UI (P4)** — есть только backend API, фронтенда нет
-  вообще. Это отдельная задача.
 - Эндпоинты под уже заведённые в схеме права `documents.moderate`,
   `shares.revoke`, `security.view`, `system.manage`, `admins.manage` —
   не реализованы (прав в БД больше, чем роутов).
@@ -181,9 +179,19 @@ Timeout budget, circuit breaker, retry policy с backoff, `/health` vs
 на модули полезно, но рискует внести регрессии без хорошего покрытия
 E2E-тестами сначала.
 
-### P4 — Admin panel
-Backend RBAC готов (P0-10 выше), но UI не реализован вообще — это
-следующий логичный шаг, раз зависимость (RBAC) закрыта.
+### P4 — Admin panel — ЧАСТИЧНО ИСПРАВЛЕНО, 23.08.2026
+Backend RBAC (см. выше) + первая версия UI (`frontend/src/features/admin/AdminPage.tsx`):
+вкладки Обзор/Пользователи/Журнал, блокировка/разблокировка/отзыв
+сессий с инлайн-подтверждением, доступ виден только реальным админам
+(тихий redirect для остальных — не граница безопасности, только UX,
+реальная защита на backend). Пункт меню в Профиле, виден только
+админам. 4 новых frontend-теста.
+
+**Осталось из P4:** остальные разделы админки из спеки аудита (Modules,
+Templates, Documents, Shares, AI/Quotas, Jobs, Security, System) —
+только Users/Dashboard/Audit Log реализованы, там backend уже покрывает
+конкретно users.view/block/revoke_sessions и audit.view. Impersonation,
+feature flags, maintenance mode — не реализовано вообще.
 
 ## Что НЕ делать по прямому указанию аудита (и я это соблюдаю)
 - Не переписывать backend с нуля.
@@ -237,11 +245,6 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 11. `7f66313` — P0-09 rate limiting на Postgres (параллельная сессия)
 12. `ea56d90` — P0-10/SEC-004 Admin RBAC
 13. `fe8a619` — P0-06 апгрейд python-jose/Pillow
-14. (этот коммит) — переименование `migrations/0011_admin_rbac.sql` →
-    `0013_...`, `0012_nexa_users_moderation.sql` → `0014_...` — на диске
-    была коллизия номеров с параллельной сессией (`0011_rate_limiting.sql`,
-    `0012_rate_limit_table_rls.sql`); в реальной Supabase коллизии НЕ было
-    (там уникальные version-timestamp'ы, не числовой префикс файла), но
-    на диске это сбивало бы с толку любого, кто попытался бы прогнать
-    файлы по порядку на новом окружении.
+14. `13cae58` — переименование мигр. 0011/0012 (коллизия с параллельной сессией) + обновление MANUAL_TODO.md
+15. `212a095` — P4 Admin panel UI
 
