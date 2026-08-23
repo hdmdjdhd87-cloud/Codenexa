@@ -129,3 +129,33 @@ async def revoke_sessions(
 @router.get("/audit-log")
 async def audit_log(page: int = 1, admin: AdminContext = Depends(require_admin("audit.view"))) -> list[dict]:
     return await repo.list_audit_log(page)
+
+
+@router.get("/security/rate-limit-hits")
+async def rate_limit_hits(
+    scope: str | None = None,
+    page: int = 1,
+    admin: AdminContext = Depends(require_admin("security.view")),
+) -> list[dict]:
+    return await repo.list_rate_limit_hits(scope, page)
+
+
+@router.get("/shares")
+async def list_shares(page: int = 1, admin: AdminContext = Depends(require_admin("shares.revoke"))) -> list[dict]:
+    return await repo.list_active_shares(page)
+
+
+@router.post("/shares/{share_id}/revoke")
+async def revoke_share(
+    share_id: str,
+    request: Request,
+    admin: AdminContext = Depends(require_admin("shares.revoke")),
+) -> dict:
+    result = await repo.admin_revoke_share(share_id)
+    if not result:
+        raise api_error(status.HTTP_404_NOT_FOUND, "SHARE_NOT_FOUND", "Ссылка не найдена или уже отозвана.")
+    await repo.log_admin_action(
+        admin.admin_id, admin.user_id, "share.revoke", "share", share_id, None,
+        ip_hash=_ip_hash(request),
+    )
+    return result

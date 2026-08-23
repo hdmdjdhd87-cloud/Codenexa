@@ -140,3 +140,85 @@ def test_block_user_404_when_user_not_found_does_not_log_audit():
             mock_log.assert_not_awaited()
         finally:
             app.dependency_overrides.clear()
+
+
+def test_rate_limit_hits_requires_security_view_permission():
+    with patch("app.admin.rbac.admin_repository.get_admin_context", new=AsyncMock(return_value={
+        "admin_id": "a1", "role_key": "support", "role_name": "Поддержка",
+        "status": "active", "permissions": {"users.view"},  # НЕТ security.view
+    })):
+        from app.auth.middleware import get_current_user_id
+        app.dependency_overrides[get_current_user_id] = lambda: "user-1"
+        try:
+            resp = client.get("/api/v1/admin/security/rate-limit-hits")
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+
+def test_rate_limit_hits_with_permission_returns_repo_data():
+    with patch("app.admin.rbac.admin_repository.get_admin_context", new=AsyncMock(return_value={
+        "admin_id": "a1", "role_key": "security_admin", "role_name": "Безопасность",
+        "status": "active", "permissions": {"security.view"},
+    })), patch("app.routers.admin.repo.list_rate_limit_hits", new=AsyncMock(return_value=[
+        {"identity": "ip:1.2.3.4", "scope": "auth", "window_start": "2026-08-23T10:00:00", "request_count": 12},
+    ])) as mock_list:
+        from app.auth.middleware import get_current_user_id
+        app.dependency_overrides[get_current_user_id] = lambda: "user-1"
+        try:
+            resp = client.get("/api/v1/admin/security/rate-limit-hits?scope=auth&page=2")
+            assert resp.status_code == 200
+            assert resp.json()[0]["identity"] == "ip:1.2.3.4"
+            mock_list.assert_awaited_once_with("auth", 2)
+        finally:
+            app.dependency_overrides.clear()
+
+
+def test_list_shares_requires_shares_revoke_permission():
+    with patch("app.admin.rbac.admin_repository.get_admin_context", new=AsyncMock(return_value={
+        "admin_id": "a1", "role_key": "content_admin", "role_name": "Контент",
+        "status": "active", "permissions": {"documents.view"},  # НЕТ shares.revoke
+    })):
+        from app.auth.middleware import get_current_user_id
+        app.dependency_overrides[get_current_user_id] = lambda: "user-1"
+        try:
+            resp = client.get("/api/v1/admin/shares")
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+
+def test_revoke_share_success_logs_audit():
+    with patch("app.admin.rbac.admin_repository.get_admin_context", new=AsyncMock(return_value={
+        "admin_id": "a1", "role_key": "operator", "role_name": "Оператор",
+        "status": "active", "permissions": {"shares.revoke"},
+    })), patch("app.routers.admin.repo.admin_revoke_share", new=AsyncMock(return_value={
+        "id": "share-1", "document_id": "doc-1", "token": "tok123", "revoked_at": "2026-08-23T10:00:00",
+    })) as mock_revoke, patch("app.routers.admin.repo.log_admin_action", new=AsyncMock()) as mock_log:
+        from app.auth.middleware import get_current_user_id
+        app.dependency_overrides[get_current_user_id] = lambda: "user-1"
+        try:
+            resp = client.post("/api/v1/admin/shares/share-1/revoke")
+            assert resp.status_code == 200
+            assert resp.json()["id"] == "share-1"
+            mock_revoke.assert_awaited_once_with("share-1")
+            mock_log.assert_awaited_once()
+            assert mock_log.call_args.args[2] == "share.revoke"
+        finally:
+            app.dependency_overrides.clear()
+
+
+def test_revoke_share_not_found_returns_404_no_audit():
+    with patch("app.admin.rbac.admin_repository.get_admin_context", new=AsyncMock(return_value={
+        "admin_id": "a1", "role_key": "operator", "role_name": "Оператор",
+        "status": "active", "permissions": {"shares.revoke"},
+    })), patch("app.routers.admin.repo.admin_revoke_share", new=AsyncMock(return_value=None)), \
+         patch("app.routers.admin.repo.log_admin_action", new=AsyncMock()) as mock_log:
+        from app.auth.middleware import get_current_user_id
+        app.dependency_overrides[get_current_user_id] = lambda: "user-1"
+        try:
+            resp = client.post("/api/v1/admin/shares/nonexistent/revoke")
+            assert resp.status_code == 404
+            mock_log.assert_not_awaited()
+        finally:
+            app.dependency_overrides.clear()

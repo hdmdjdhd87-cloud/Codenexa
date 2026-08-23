@@ -202,6 +202,84 @@ async def revoke_user_sessions(user_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+async def list_rate_limit_hits(scope: str | None = None, page: int = 1, page_size: int = 50) -> list[dict]:
+    """security.view — последние rate-limit окна, самые свежие/самые
+    "горячие" (request_count) первыми, чтобы аномалии были видны сразу,
+    а не потерялись в хронологическом потоке."""
+    pool = await _pool_or_503()
+    offset = max(0, page - 1) * page_size
+    async with pool.acquire() as conn:
+        if scope:
+            rows = await conn.fetch(
+                """
+                select identity, scope, window_start, request_count
+                from nexa_rate_limit_hits
+                where scope = $1
+                order by window_start desc, request_count desc
+                limit $2 offset $3
+                """,
+                scope,
+                page_size,
+                offset,
+            )
+        else:
+            rows = await conn.fetch(
+                """
+                select identity, scope, window_start, request_count
+                from nexa_rate_limit_hits
+                order by window_start desc, request_count desc
+                limit $1 offset $2
+                """,
+                page_size,
+                offset,
+            )
+    return [dict(r) for r in rows]
+
+
+async def list_active_shares(page: int = 1, page_size: int = 30) -> list[dict]:
+    """shares.revoke — список публичных ссылок ВСЕХ пользователей (не
+    только своих, в отличие от обычного GET /aidocs/shares) — админ
+    модерирует чужой контент, поэтому без user_id-фильтра, но защищено
+    require_admin('shares.revoke') на уровне роутера."""
+    pool = await _pool_or_503()
+    offset = max(0, page - 1) * page_size
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            select s.id, s.token, s.expires_at, s.revoked_at, s.created_at,
+                   d.id as document_id, d.title as document_title,
+                   u.id as owner_id, u.username as owner_username, u.telegram_user_id as owner_telegram_id
+            from nexa_docs_shares s
+            join nexa_docs_documents d on d.id = s.document_id
+            join nexa_users u on u.id = s.user_id
+            where s.revoked_at is null and (s.expires_at is null or s.expires_at > now())
+            order by s.created_at desc
+            limit $1 offset $2
+            """,
+            page_size,
+            offset,
+        )
+    return [dict(r) for r in rows]
+
+
+async def admin_revoke_share(share_id: str) -> dict | None:
+    """В отличие от обычного repo.revoke_share(user_id, share_id) — без
+    проверки владения, т.к. это admin-модерация чужого контента (сама
+    авторизация — require_admin('shares.revoke') на уровне роутера, не
+    здесь)."""
+    pool = await _pool_or_503()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            update nexa_docs_shares set revoked_at = now()
+            where id = $1 and revoked_at is null
+            returning id, document_id, token, revoked_at
+            """,
+            share_id,
+        )
+    return dict(row) if row else None
+
+
 async def dashboard_counts() -> dict:
     """Минимальный, но реальный dashboard (не выдуманные метрики) —
     полноценные p50/p95/p99/observability из аудита (P1) сюда
