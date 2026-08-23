@@ -111,19 +111,59 @@
 консервативно-щедрые стартовые оценки, не откалиброваны по реальным
 метрикам (которых пока нет — аудит сам это отмечает).
 
-### P0-10 / SEC-004 — Admin RBAC
-Не реализовано. В аудите прямо сказано не делать admin через
-`if telegram_user_id == ...` в роутере — это значит полноценная схема
-(`admin_users/admin_roles/admin_permissions/admin_audit_log`) + миграции
-+ UI. Крупный отдельный кусок работы (реалистично — отдельная
-многосессионная задача).
+### P0-10 / SEC-004 — Admin RBAC — ИСПРАВЛЕНО, 23.08.2026
+Схема `admin_roles/admin_permissions/admin_role_permissions/admin_users/
+admin_audit_log` (`migrations/0013_admin_rbac.sql`), не хардкодит admin
+по Telegram ID — owner назначается через seed-запись в `admin_users` по
+`telegram_user_id`, дальше всё решает БД-схема ролей/прав.
 
-### P0-06 — Обновление зависимостей (python-jose, Pillow)
-Не сделано в этой сессии. Мажорные апгрейды таких пакетов рискуют
-сломать существующую функциональность (JWT/OCR) без полного regression-
-прогона на реальном трафике — сначала стоит поднять версии на
-отдельной ветке и прогнать весь тест-сьют + вручную протестировать
-Telegram-авторизацию и загрузку фото.
+- 5 ролей: owner/security_admin/operator/support/content_admin с разными
+  наборами прав (owner получает все права на уровне кода, не отдельными
+  строками — не может "забыть" выдать себе новое право, когда оно
+  появляется в системе).
+- `admin_audit_log` — append-only (`REVOKE DELETE, UPDATE`), пишется
+  ПОСЛЕ успешного действия (неудавшиеся попытки не аудируются отдельной
+  строкой), IP хранится только как sha256-хэш (не сырой адрес).
+- `app/auth/middleware.get_current_user_id` теперь дополнительно
+  проверяет `is_blocked`/`sessions_valid_from` из `nexa_users`
+  (`migrations/0014_nexa_users_moderation.sql`) — без этого "заблокировать
+  пользователя"/"отозвать сессии" из будущей админки были бы
+  косметическими действиями без реального эффекта на уже выданный JWT.
+  Это добавляет 1 DB-запрос на КАЖДЫЙ авторизованный запрос во всём
+  приложении — сознательный trade-off, fail-CLOSED (503) при недоступности
+  БД, а не fail-open (это security-проверка, не rate-limiting).
+- Backend API: `GET /api/v1/admin/me,/dashboard,/users,/users/{id},
+  /audit-log`, `POST /users/{id}/block,/unblock,/revoke-sessions`.
+- **Применено к реальной БД и проверено напрямую**: owner-запись создана
+  (`telegram_user_id=8129422076`, роль `owner`, status `active`), RLS
+  `enabled=true` на всех 5 admin-таблицах, `anon`/`authenticated` — 0
+  grants, новые колонки на `nexa_users` читаются корректно.
+- 21 новый тест (middleware blocked/revoked/db-down, RBAC permission
+  resolution, admin router через TestClient) — все проходят.
+
+**Осталось (не блокирует прод, но не готово):**
+- **Admin panel UI (P4)** — есть только backend API, фронтенда нет
+  вообще. Это отдельная задача.
+- Эндпоинты под уже заведённые в схеме права `documents.moderate`,
+  `shares.revoke`, `security.view`, `system.manage`, `admins.manage` —
+  не реализованы (прав в БД больше, чем роутов).
+- Гоночные сценарии RBAC (два одновременных запроса на смену роли и
+  т.п.) — **NOT VERIFIED**, нет живого Postgres для интеграционных
+  тестов в песочнице.
+
+### P0-06 — Обновление зависимостей (python-jose, Pillow) — ИСПРАВЛЕНО, 23.08.2026
+- `python-jose[cryptography]`: 3.3.0 → 3.5.0 (патч-версии внутри той же
+  мажорной линии).
+- `Pillow`: 10.4.0 → 12.3.0 (два мажорных скачка, но в кодовой базе
+  используется ровно в одном месте — `app/document_engine/ocr.py` —
+  через `Image.open()` + `.load()`, самое стабильное API, не менявшееся
+  между этими версиями).
+- Проверено НЕ только прогоном тестов: ручной sanity-запуск полного OCR-
+  пайплайна на английском тексте через реальный Tesseract + Pillow 12.3.0
+  (текст распознан), ручной JWT create/verify roundtrip с python-jose 3.5.0
+  (токен создан, подписан, проверен). `app.server:app` по-прежнему
+  импортируется. Полный тест-сьют: 216 passed / 1 failed (тот же
+  предсуществующий OCR-кириллица флейк, не связан с апгрейдом).
 
 ### P1 — Reliability по остальным пунктам
 Timeout budget, circuit breaker, retry policy с backoff, `/health` vs
@@ -142,7 +182,8 @@ Timeout budget, circuit breaker, retry policy с backoff, `/health` vs
 E2E-тестами сначала.
 
 ### P4 — Admin panel
-Не реализовано (зависит от P0-10/RBAC).
+Backend RBAC готов (P0-10 выше), но UI не реализован вообще — это
+следующий логичный шаг, раз зависимость (RBAC) закрыта.
 
 ## Что НЕ делать по прямому указанию аудита (и я это соблюдаю)
 - Не переписывать backend с нуля.
@@ -177,7 +218,8 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 
 **Известный нестабильный тест:** `test_ocr.py::test_extract_text_from_image_cyrillic`
 падает в песочнице (нет `rus.traineddata`) — проверьте в production,
-что кириллический пакет Tesseract там установлен.
+что кириллический пакет Tesseract там установлен. Backend сейчас:
+216 тестов (было 159), +21 из admin RBAC.
 
 ---
 
@@ -190,4 +232,16 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 6. `6b2218a` — идемпотентность create/restore/duplicate/share (v1)
 7. `aa08658` — MANUAL_TODO.md (первая версия)
 8. `a169b9b` — SEC-002 config drift + SEC-003/F-003/F-004 idempotency state machine (v2)
+9. `1a6072f` — SEC-001/P0-01 RLS/GRANT lockdown (другая параллельная сессия)
+10. `50c9380` — F-011 healthcheck / F-014 CORS / F-015 ai_is_configured (параллельная сессия)
+11. `7f66313` — P0-09 rate limiting на Postgres (параллельная сессия)
+12. `ea56d90` — P0-10/SEC-004 Admin RBAC
+13. `fe8a619` — P0-06 апгрейд python-jose/Pillow
+14. (этот коммит) — переименование `migrations/0011_admin_rbac.sql` →
+    `0013_...`, `0012_nexa_users_moderation.sql` → `0014_...` — на диске
+    была коллизия номеров с параллельной сессией (`0011_rate_limiting.sql`,
+    `0012_rate_limit_table_rls.sql`); в реальной Supabase коллизии НЕ было
+    (там уникальные version-timestamp'ы, не числовой префикс файла), но
+    на диске это сбивало бы с толку любого, кто попытался бы прогнать
+    файлы по порядку на новом окружении.
 

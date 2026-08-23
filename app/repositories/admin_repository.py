@@ -2,7 +2,7 @@
 Admin RBAC repository (P0-10, аудит 22.08.2026).
 
 Роли/права хранятся в БД (admin_roles/admin_permissions/
-admin_role_permissions, см. migrations/0011), не хардкодятся в
+admin_role_permissions, см. migrations/0013), не хардкодятся в
 Python — можно менять матрицу прав без деплоя.
 
 owner получает ВСЕ существующие permission-ключи автоматически на

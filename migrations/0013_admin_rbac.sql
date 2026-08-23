@@ -1,5 +1,5 @@
 -- ============================================================
--- CodeNexa System — Core migration 0011
+-- CodeNexa System — Core migration 0013
 -- Admin RBAC (P0-10 / SEC-004 из production-аудита 22.08.2026).
 -- Аудит прямо запрещает делать admin через
 -- `if telegram_user_id == <hardcoded>` в роутерах — вместо этого
