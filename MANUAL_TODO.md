@@ -15,44 +15,52 @@
 либо сломать всё приложение, либо оставить дыру, а я не могу
 протестировать это против вашей реальной Supabase.
 
-## Сделано и запушено (commit `a169b9b`)
+## Сделано и запушено
 
-- **SEC-002 (config drift)** — `app/database.py`: `extract_supabase_project_ref()`
-  + опциональный fail-fast `EXPECTED_DB_PROJECT_REF`; `.env.example`
-  больше не содержит захардкоженный (возможно, устаревший) Supabase URL.
-  9 тестов.
-- **SEC-003 / F-003 / F-004 (idempotency race)** — `app/repositories/idempotency.py`
-  переписан на recoverable state machine (pending/completed/failed +
-  lease + request_hash), не держит DB-connection во время `work_fn()`.
-  Миграция `migrations/0009_ai_docs_idempotency_state_machine.sql`.
-  12 тестов на то, что тестируется без живого Postgres; гоночные
-  сценарии (два конкурентных claim, recovery после краша) честно
-  помечены как **NOT VERIFIED** — нужен integration-тест против
-  реального Postgres, которого у меня в песочнице нет.
+- **SEC-002 (config drift)** — commit `a169b9b`. `app/database.py`:
+  `extract_supabase_project_ref()` + опциональный fail-fast
+  `EXPECTED_DB_PROJECT_REF`; `.env.example` больше не содержит
+  захардкоженный (возможно, устаревший) Supabase URL. 9 тестов.
+- **SEC-003 / F-003 / F-004 (idempotency race)** — commit `a169b9b`.
+  `app/repositories/idempotency.py` переписан на recoverable state
+  machine (pending/completed/failed + lease + request_hash), не держит
+  DB-connection во время `work_fn()`. Миграция
+  `migrations/0009_ai_docs_idempotency_state_machine.sql` — применена
+  к реальной БД и проверена (см. ниже). 12 тестов на то, что тестируется
+  без живого Postgres; гоночные сценарии (два конкурентных claim,
+  recovery после краша) честно помечены как **NOT VERIFIED** — нужен
+  integration-тест против реального Postgres.
+- **SEC-001 / P0-01 (RLS/GRANT) — ИСПРАВЛЕНО, 23.08.2026.** Подключён
+  Supabase MCP-коннектор, находка аудита проверена напрямую по факту
+  (не по описанию из PDF) и подтверждена:
+  - RLS был выключен на всех 14 таблицах `nexa_*`;
+  - `anon` и `authenticated` имели полный `DELETE/INSERT/SELECT/UPDATE/
+    TRUNCATE` на всех `nexa_*`, включая `nexa_users` — то есть у
+    любого, кто знает публичный `anon key` проекта, был прямой доступ
+    ко всем данным всех пользователей в обход бэкенда через Supabase
+    REST API;
+  - проверено (`grep`), что приложение нигде не использует Supabase
+    Data API/PostgREST/`anon key` — весь доступ идёт через
+    `DATABASE_URL` (asyncpg), поэтому чинить это через RLS-политики
+    было избыточно и рискованно — правильный фикс - `REVOKE`;
+  - проверено, что роль `postgres` (которой подключается backend) и
+    `service_role` имеют `rolbypassrls=true` — значит, включение RLS
+    без единой policy (defense-in-depth) даёт честный default-deny для
+    `anon`/`authenticated`, не затрагивая работу приложения.
+  - Применена миграция `migrations/0010_nexa_rls_lockdown.sql` — REVOKE
+    ALL от `anon`/`authenticated` на всех 14 таблицах + `ALTER DEFAULT
+    PRIVILEGES` (защита от будущих таблиц) + `ENABLE ROW LEVEL SECURITY`
+    на всех 14 таблицах.
+  - **Проверено после применения:** `anon`/`authenticated` — 0 grants на
+    все `nexa_*`; `postgres` — все права сохранены, не тронуты; чтение
+    данных (`select count(*) from nexa_docs_documents`) работает
+    нормально; RLS `enabled=true` на всех 14 таблицах.
 
-**⚠️ Требуется от вас:** применить `migrations/0009_...sql` в Supabase
-SQL Editor (после уже применённой `0008`) — без неё новый код
-`idempotency.py` будет падать на несуществующих колонках.
+**⚠️ Требуется от вас:** ничего — миграции `0009` и `0010` уже применены
+напрямую к продовой БД через MCP и проверены. Файлы синхронизированы в
+`migrations/` для истории/восстановления на новом окружении.
 
-## КРИТИЧНО — не тронуто намеренно, требует вашего решения
-
-### SEC-001 / P0-01 — RLS и GRANT на nexa_* таблицах
-Аудит утверждает, что RLS выключен, а `anon`/`authenticated` имеют
-широкие права на `nexa_*` таблицы. **Я не могу это подтвердить сам** —
-у меня нет доступа к вашей живой Supabase. Если это действительно так —
-это самая серьёзная находка во всём документе.
-
-Я **не буду** присылать вам "просто выполните этот SQL" для RLS без
-дополнительного шага: неправильная политика может либо обнулить доступ
-приложения к его же данным (полный даунтайм), либо оставить дыру, если
-политика написана некорректно. Правильная последовательность:
-1. Зайти в Supabase Dashboard → Database → Roles/Policies, вручную
-   проверить текущие GRANT для `anon`/`authenticated` на `nexa_*`.
-2. Прислать мне результат (или скриншот) — тогда я подготовлю миграцию
-   под ваш реальный текущий доступ, а не вслепую.
-3. Применить сначала на ветке/staging проекте Supabase (если есть),
-   прогнать negative-тесты (пользователь A не видит данные пользователя
-   B), и только потом на проде.
+## Остаётся — крупные отдельные задачи, не тронуто в этой сессии
 
 ### P0-09 — Rate limiting
 Не реализовано. Требует Redis или аналог + отдельный слой per-user/IP
@@ -105,14 +113,10 @@ E2E-тестами сначала.
 
 # А. Список из первой сессии (см. историю коммитов до `aa08658`)
 
-## 1. Применить миграции к реальной БД (Supabase)
+## 1. Миграции к реальной БД
 
-Файлы: `migrations/0008_ai_docs_idempotency.sql`,
-`migrations/0009_ai_docs_idempotency_state_machine.sql` (0009 требует,
-чтобы 0008 была применена раньше).
-
-**Что сделать:** Supabase → SQL Editor → выполнить оба файла по
-порядку (0008, затем 0009).
+Все миграции `0001`–`0010` применены к продовой Supabase и проверены
+напрямую (см. раздел Б выше). Ничего применять вручную не нужно.
 
 ## 2. Visual QA на реальных экранах
 
