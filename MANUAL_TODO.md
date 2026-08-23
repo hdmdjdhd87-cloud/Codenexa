@@ -142,9 +142,9 @@ admin_audit_log` (`migrations/0013_admin_rbac.sql`), не хардкодит adm
   resolution, admin router через TestClient) — все проходят.
 
 **Осталось (не блокирует прод, но не готово):**
-- Эндпоинты под уже заведённые в схеме права `documents.moderate`,
-  `shares.revoke`, `security.view`, `system.manage`, `admins.manage` —
-  не реализованы (прав в БД больше, чем роутов).
+- Эндпоинты под `documents.moderate`, `system.manage`, `admins.manage` —
+  ещё не реализованы. `security.view` (rate-limit hits) и `shares.revoke`
+  реализованы (см. `06d14f1`).
 - Гоночные сценарии RBAC (два одновременных запроса на смену роли и
   т.п.) — **NOT VERIFIED**, нет живого Postgres для интеграционных
   тестов в песочнице.
@@ -164,10 +164,19 @@ admin_audit_log` (`migrations/0013_admin_rbac.sql`), не хардкодит adm
   предсуществующий OCR-кириллица флейк, не связан с апгрейдом).
 
 ### P1 — Reliability по остальным пунктам
-Timeout budget, circuit breaker, retry policy с backoff, `/health` vs
-`/ready` разделение (аудит утверждает, что Railway healthcheck сейчас
-смотрит на `/health`, который не проверяет БД — если это так, стоит
-поправить конфиг Railway) — не реализовано.
+**F-012/F-013 — ИСПРАВЛЕНО, 23.08.2026** (см. `7430c9d`): safe retry
+policy для `apiRequest` (GET/HEAD всегда, мутации — только с
+Idempotency-Key; exponential backoff+jitter; не ретраит семантические
+4xx) + таймаут(30s)/401-восстановление для `downloadAuthorizedFile`
+(раньше не было ни того, ни другого — мог зависнуть навсегда). 18
+новых тестов.
+
+**Осталось из P1:** circuit breaker/backpressure для AI/OCR, `/health`
+vs `/ready` разделение (F-011 уже поправлен параллельной сессией — см.
+`50c9380` — но стоит перепроверить `railway.json` живьём в Railway
+dashboard, я не могу подтвердить, что там реально настроено), не
+держать DB-connection во время CPU-heavy work (частично уже сделано
+в idempotency.py, `a169b9b`), background jobs для тяжёлых OCR/export.
 
 ### P2 — Scale (FTS вместо ILIKE, retention/cleanup idempotency-ключей, connection budget)
 Не реализовано — имеет смысл делать по факту реальной нагрузки, а не
@@ -247,4 +256,6 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 13. `fe8a619` — P0-06 апгрейд python-jose/Pillow
 14. `13cae58` — переименование мигр. 0011/0012 (коллизия с параллельной сессией) + обновление MANUAL_TODO.md
 15. `212a095` — P4 Admin panel UI
+16. `7430c9d` — F-012/F-013 retry policy + download timeout/401-recovery
+17. `06d14f1` — security.view (rate-limit hits) + shares.revoke эндпоинты
 
