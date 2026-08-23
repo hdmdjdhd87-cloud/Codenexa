@@ -67,5 +67,16 @@ def get_ai_provider() -> AIProvider:
 
 
 def ai_is_configured() -> bool:
-    settings = get_settings()
-    return bool(getattr(settings, "anthropic_api_key", "") or getattr(settings, "openai_api_key", ""))
+    """
+    F-015 (production-аудит 22.08.2026): раньше эта функция смотрела на
+    переменные окружения НЕЗАВИСИМО от get_ai_provider(), который сейчас
+    всегда возвращает UnavailableAIProvider — если бы ANTHROPIC_API_KEY/
+    OPENAI_API_KEY случайно оказался задан в окружении (например, для
+    другого сервиса), фронтенд показал бы "AI доступен", хотя каждый
+    реальный вызов падал бы с AIUnavailableError.
+
+    Теперь honest-by-construction: результат буквально следует из того,
+    какой провайдер вернёт get_ai_provider(), рассинхрон структурно
+    невозможен, пока в проекте одна реализация.
+    """
+    return not isinstance(get_ai_provider(), UnavailableAIProvider)

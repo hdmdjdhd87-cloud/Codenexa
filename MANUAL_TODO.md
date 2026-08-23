@@ -62,6 +62,24 @@
 
 ## Остаётся — крупные отдельные задачи, не тронуто в этой сессии
 
+### F-011 — Railway healthcheck / F-014 — CORS / F-015 — ai_is_configured — ИСПРАВЛЕНО
+Все три — код-ревью, без риска для прода, все проверены тестами:
+- **F-011**: `railway.json` указывал `healthcheckPath: /health` (liveness-
+  only, не проверяет БД) — при деплое Railway мог переключить трафик на
+  инстанс с нерабочим подключением к БД. Исправлено на `/ready` (код
+  `/health` vs `/ready` уже был правильно разделён в `app/routers/health.py`,
+  проблема была только в конфиге).
+- **F-014**: CORS `allow_methods`/`allow_headers` были `["*"]`. Сужено до
+  реально используемого набора (проверено grep по всему `frontend/src`):
+  методы `GET/POST/PATCH/DELETE`, заголовки `Authorization/Content-Type/
+  Idempotency-Key`. 3 теста на preflight-запрос.
+- **F-015**: `ai_is_configured()` могла вернуть `True` по наличию
+  `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` в окружении, даже когда
+  `get_ai_provider()` всё равно всегда возвращает `UnavailableAIProvider`
+  — рассинхрон, который вводил бы фронтенд в заблуждение ("AI доступен",
+  хотя каждый вызов падает). Теперь `ai_is_configured()` структурно
+  следует за `get_ai_provider()` — рассинхрон невозможен. 4 теста.
+
 ### P0-09 — Rate limiting
 Не реализовано. Требует Redis или аналог + отдельный слой per-user/IP
 лимитов — это отдельный инфраструктурный компонент, не однострочная

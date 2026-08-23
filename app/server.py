@@ -36,8 +36,14 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        # F-014 (production-аудит 22.08.2026): было allow_methods=["*"]/
+        # allow_headers=["*"]. Сужено до реально используемого набора —
+        # проверено по всему frontend/src (apiClient.ts, aidocsService.ts):
+        # методы GET/POST/PATCH/DELETE, заголовки Authorization/
+        # Content-Type/Idempotency-Key. Если добавите новый заголовок на
+        # фронтенде — не забудьте добавить его и сюда.
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
     )
 
     @app.exception_handler(HTTPException)
