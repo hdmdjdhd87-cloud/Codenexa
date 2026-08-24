@@ -12,7 +12,7 @@ from app.document_engine.template_fill import fill_template, validate_required_f
 from app.document_engine.docx_renderer import render_docx
 from app.document_engine.pdf_renderer import render_pdf
 from app.document_engine.qa import DocumentQAError, check_docx, check_pdf
-from app.document_engine.ocr import OcrError, extract_text_from_image, MAX_IMAGE_BYTES
+from app.document_engine.ocr import OcrError, extract_text_from_image_async, MAX_IMAGE_BYTES
 from app.document_engine.import_reader import (
     ImportError_,
     extract_text_from_docx_file,
@@ -248,7 +248,7 @@ async def ocr_image(
     """
     data = await read_upload_with_limit(file, MAX_IMAGE_BYTES, "Файл слишком большой (максимум 10 МБ).")
     try:
-        text = extract_text_from_image(data, content_type=file.content_type)
+        text = await extract_text_from_image_async(data, content_type=file.content_type)
     except OcrError as exc:
         raise api_error(status.HTTP_400_BAD_REQUEST, "OCR_FAILED", str(exc)) from exc
 
