@@ -30,8 +30,13 @@ async def create_notification(user_id: str, type_: str, title: str, message: str
     return dict(row)
 
 
-async def list_notifications(user_id: str) -> list[dict]:
+async def list_notifications(user_id: str, page: int = 1, page_size: int = 50) -> list[dict]:
     pool = await _pool_or_503()
+    # P2 из аудита 22.08.2026: список уведомлений растёт со временем
+    # (генерируется системой, не только пользователем) — без границы
+    # рано или поздно вернул бы весь накопленный объём одним ответом.
+    page_size = max(1, min(page_size, 200))
+    offset = max(0, page - 1) * page_size
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
@@ -39,8 +44,11 @@ async def list_notifications(user_id: str) -> list[dict]:
             from nexa_notifications
             where user_id = $1
             order by created_at desc
+            limit $2 offset $3
             """,
             user_id,
+            page_size,
+            offset,
         )
     return [dict(r) for r in rows]
 

@@ -73,8 +73,16 @@ async def list_templates_full() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-async def list_documents(user_id: str, search: str | None = None) -> list[dict]:
+async def list_documents(user_id: str, search: str | None = None, page: int = 1, page_size: int = 100) -> list[dict]:
     pool = await _pool_or_503()
+    # P2 из аудита 22.08.2026: "Добавить pagination во все потенциально
+    # большие списки" / "Не отдавать десятки тысяч записей одним HTTP
+    # response". page_size capped на уровне роутера (Query le=200) —
+    # здесь дополнительно ограничиваем ещё раз на случай прямого вызова
+    # repo-функции в обход роутера (defense in depth, не полагаемся на
+    # единственный уровень валидации).
+    page_size = max(1, min(page_size, 200))
+    offset = max(0, page - 1) * page_size
     async with pool.acquire() as conn:
         if search and search.strip():
             prefix_query = _build_prefix_tsquery(search)
@@ -97,9 +105,12 @@ async def list_documents(user_id: str, search: str | None = None) -> list[dict]:
                 where user_id = $1
                   and search_text @@ to_tsquery('russian', $2)
                 order by ts_rank(search_text, to_tsquery('russian', $2)) desc, updated_at desc
+                limit $3 offset $4
                 """,
                 user_id,
                 prefix_query,
+                page_size,
+                offset,
             )
         else:
             rows = await conn.fetch(
@@ -108,8 +119,11 @@ async def list_documents(user_id: str, search: str | None = None) -> list[dict]:
                 from nexa_docs_documents
                 where user_id = $1
                 order by updated_at desc
+                limit $2 offset $3
                 """,
                 user_id,
+                page_size,
+                offset,
             )
     return [dict(r) for r in rows]
 

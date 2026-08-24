@@ -90,9 +90,12 @@ async def create_document(
 
 @router.get("/documents")
 async def get_documents(
-    search: str | None = Query(default=None), user_id: str = Depends(get_current_user_id)
+    search: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=200),
+    user_id: str = Depends(get_current_user_id),
 ) -> list[dict]:
-    return await repo.list_documents(user_id, search=search)
+    return await repo.list_documents(user_id, search=search, page=page, page_size=page_size)
 
 
 @router.get("/documents/{document_id}")
