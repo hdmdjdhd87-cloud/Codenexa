@@ -199,10 +199,18 @@ dashboard, я не могу подтвердить, что там реально
 доказан"), frontend UI для "следующей страницы" (infinite scroll/кнопка
 "Ещё") — backend готов, фронтенд пока нет.
 
-### P3 — Frontend (разбить AiDocsApp.tsx, E2E Playwright, visual regression)
-Не сделано. `AiDocsApp.tsx` действительно большой (~58KB) — разбиение
-на модули полезно, но рискует внести регрессии без хорошего покрытия
-E2E-тестами сначала.
+### P3 — Frontend — ЧАСТИЧНО ИСПРАВЛЕНО, 23.08.2026
+**Разбит `AiDocsApp.tsx`** (`cf11365`) — было 1382 строки в одном
+файле, стало 8 файлов (117-строчный оркестратор + 7 view-модулей).
+Проверено: `tsc -b` чисто, размер бандла идентичен до/после (нет
+дублирования кода), 32/32 frontend-тестов проходят.
+
+**Осталось из P3:** `views/DocumentPreviewView.tsx` всё ещё крупный
+(612 строк — версии/сравнение/анализ/шаринг/дублирование в одном
+файле), можно дробить дальше на VersionHistory/CompareView/
+AnalysisPanel/ShareDialog отдельным заходом. E2E Playwright — не
+реализовано вообще. Visual regression — не реализовано (и не может
+быть реализовано мной без реального Telegram-клиента).
 
 ### P4 — Admin panel — ЧАСТИЧНО ИСПРАВЛЕНО, 23.08.2026
 Backend RBAC (см. выше) + первая версия UI (`frontend/src/features/admin/AdminPage.tsx`):
@@ -278,4 +286,5 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 19. `855e176` — retention/cleanup для idempotency-ключей (pg_cron)
 20. `b134762` — retention/cleanup для expired shares и rate-limit окон
 21. `935e8aa` — пагинация GET /documents и GET /notifications
+22. `cf11365` — разбит AiDocsApp.tsx на 8 feature-модулей
 
