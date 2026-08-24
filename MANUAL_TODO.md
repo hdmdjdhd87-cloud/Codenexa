@@ -183,13 +183,24 @@ body-size limit — если перед приложением стоит Railwa
 6 новых тестов, включая regression-тест на раннее прерывание чтения
 50MB "файла" на кастомном потоке с подсчётом реально прочитанных байт.
 
-**Осталось из P1:** circuit breaker/backpressure для AI/OCR, `/health`
-vs `/ready` разделение (F-011 уже поправлен параллельной сессией — см.
-`50c9380` — но стоит перепроверить `railway.json` живьём в Railway
-dashboard, я не могу подтвердить, что там реально настроено), не
-держать DB-connection во время CPU-heavy work (частично уже сделано
-в idempotency.py, `a169b9b`), background jobs для тяжёлых OCR/export,
-body-size limit на уровне reverse-proxy/Railway (вне этого репозитория).
+**Осталось из P1:** `/health` vs `/ready` разделение (F-011 уже поправлен
+параллельной сессией — см. `50c9380` — но стоит перепроверить
+`railway.json` живьём в Railway dashboard, я не могу подтвердить, что
+там реально настроено), background jobs для тяжёлых export'ов (OCR уже
+закрыт — см. ниже), body-size limit на уровне reverse-proxy/Railway
+(вне этого репозитория).
+
+**P1 — OCR bounded concurrency + backpressure — ИСПРАВЛЕНО, 24.08.2026**
+(см. `9363d4c`): по пути найдена и исправлена более базовая проблема —
+Tesseract (блокирующий subprocess) выполнялся синхронно прямо внутри
+`async def` роута, блокируя ВЕСЬ event loop на время OCR (не только
+OCR-запросы — буквально все запросы к серверу одновременно).
+`extract_text_from_image_async()` offload'ит вызов в поток
+(`asyncio.to_thread`), плюс `asyncio.Semaphore(3)` + backpressure (503
+`OCR_BUSY` с `Retry-After: 5`, если слот не освобождается за 5s, вместо
+бесконечного ожидания). 6 новых тестов, включая regression-тест,
+явно доказывающий, что event loop больше не блокируется (параллельная
+"тикающая" задача продолжает выполняться, пока OCR ещё работает).
 
 ### P2 — Scale — ЧАСТИЧНО ИСПРАВЛЕНО, 23.08.2026
 - **F-017 (FTS вместо ILIKE)** — `b7d47e2`. `search_text` STORED
@@ -301,4 +312,5 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 21. `935e8aa` — пагинация GET /documents и GET /notifications
 22. `cf11365` — разбит AiDocsApp.tsx на 8 feature-модулей
 23. `32c6753` — F-006 streaming upload с ранним прерыванием по размеру
+24. `9363d4c` — P1 OCR bounded concurrency + backpressure + event loop fix
 
