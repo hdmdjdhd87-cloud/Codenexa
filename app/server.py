@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.database import connect, disconnect
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers import auth, favorites, health, history, modules, notifications, projects, settings as settings_router, users, aidocs, admin
 
 logging.basicConfig(level=logging.INFO)
@@ -55,6 +56,14 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
     )
+
+    # Самый внешний слой (добавлен последним) — гарантирует, что security-
+    # заголовки попадают буквально на ЛЮБОЙ ответ клиенту: успешный,
+    # ошибку от exception_handler'а, 429 от RateLimitMiddleware, CORS
+    # preflight и т.д. (раздел 4 аудита 22.08.2026: "Security headers:
+    # Недостаточно — CSP, Referrer-Policy, X-Content-Type-Options, frame
+    # policy").
+    app.add_middleware(SecurityHeadersMiddleware)
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
