@@ -26,7 +26,15 @@ from dataclasses import dataclass
 from urllib.parse import parse_qsl
 
 # Максимальный возраст initData, после которого считаем его истёкшим (replay-защита).
-INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60  # 24 часа
+INIT_DATA_MAX_AGE_SECONDS = 60 * 60  # 1 час
+# P0-03 из аудита 22.08.2026 ("Auth hardening" / раздел 5 "Authentication
+# / Telegram"): было 24 часа — неоправданно широкое окно для replay
+# перехваченного initData. Telegram отдаёт СВЕЖИЙ initData при каждом
+# запуске Mini App (WebApp.initData тесно привязан к конкретному
+# launch), поэтому легитимный auth_date почти всегда — секунды, не часы.
+# 1 час — щедрый запас на случай, если пользователь оставил вкладку в
+# фоне Telegram и вернулся не сразу, но на порядок меньше окна для
+# злоупотребления перехваченной строкой initData, чем было раньше.
 
 
 class TelegramAuthError(Exception):

@@ -5,7 +5,20 @@
 Ничего секретное здесь не хардкодится и не коммитится.
 """
 from functools import lru_cache
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# P0-03 из аудита 22.08.2026: "Ограничить JWT algorithm конфигом
+# allowlist и fail-fast на слабых/неожиданных значениях". jose.jwt.decode
+# уже вызывается с algorithms=[settings.jwt_algorithm] — ОДНИМ значением,
+# не списком/wildcard, поэтому классическая atака alg-confusion
+# (например RS256 vs HS256 путаница) здесь неприменима в принципе. Но
+# без этой проверки ничто не мешало бы случайно выставить
+# JWT_ALGORITHM=none в .env — jose приняла бы ЛЮБОЙ неподписанный токен
+# как валидный. Allowlist — только симметричные HMAC-алгоритмы,
+# соответствующие тому, как токен реально создаётся (общий jwt_secret,
+# не пара приватный/публичный ключ).
+_ALLOWED_JWT_ALGORITHMS = {"HS256", "HS384", "HS512"}
 
 
 class Settings(BaseSettings):
@@ -24,6 +37,17 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 12  # 12 часов
+
+    @field_validator("jwt_algorithm")
+    @classmethod
+    def _validate_jwt_algorithm(cls, value: str) -> str:
+        if value not in _ALLOWED_JWT_ALGORITHMS:
+            raise ValueError(
+                f"JWT_ALGORITHM={value!r} не в допустимом списке {sorted(_ALLOWED_JWT_ALGORITHMS)}. "
+                "Это fail-fast защита от случайной конфигурации вроде 'none' "
+                "(приняла бы любой неподписанный токен как валидный) — см. P0-03 аудита 22.08.2026."
+            )
+        return value
 
     # --- Supabase (если нужен прямой REST/Storage доступ) ---
     # ВНИМАНИЕ: это поле сейчас НИГДЕ в коде не используется для
