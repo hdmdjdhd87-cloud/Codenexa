@@ -142,7 +142,7 @@ admin_audit_log` (`migrations/0013_admin_rbac.sql`), не хардкодит adm
   resolution, admin router через TestClient) — все проходят.
 
 **Осталось (не блокирует прод, но не готово):**
-- Эндпоинты под `documents.moderate`, `system.manage`, `admins.manage` —
+- эндпоинты под `documents.moderate`, `system.manage`, `admins.manage` —
   ещё не реализованы. `security.view` (rate-limit hits) и `shares.revoke`
   реализованы (см. `06d14f1`).
 - Гоночные сценарии RBAC (два одновременных запроса на смену роли и
@@ -162,6 +162,16 @@ admin_audit_log` (`migrations/0013_admin_rbac.sql`), не хардкодит adm
   (токен создан, подписан, проверен). `app.server:app` по-прежнему
   импортируется. Полный тест-сьют: 216 passed / 1 failed (тот же
   предсуществующий OCR-кириллица флейк, не связан с апгрейдом).
+
+### P0-07 — Security headers — ИСПРАВЛЕНО, 24.08.2026
+`app/middleware/security_headers.py` — CSP (script-src 'none', т.к. ни
+JSON API, ни HTML share-viewer не используют JS вообще), X-Content-
+Type-Options: nosniff, X-Frame-Options: DENY, Referrer-Policy, HSTS,
+Permissions-Policy (blocked geolocation/camera/microphone — не
+используются нигде во frontend, проверено grep'ом). Подключено как
+самый внешний middleware — заголовки долетают на 401/404/CORS
+preflight, не только на успешные ответы (проверено явно). 6 новых
+тестов, полный набор: 250 passed / 1 failed (предсуществующий флейк).
 
 ### P1 — Reliability по остальным пунктам
 **F-012/F-013 — ИСПРАВЛЕНО, 23.08.2026** (см. `7430c9d`): safe retry
@@ -313,4 +323,5 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 22. `cf11365` — разбит AiDocsApp.tsx на 8 feature-модулей
 23. `32c6753` — F-006 streaming upload с ранним прерыванием по размеру
 24. `9363d4c` — P1 OCR bounded concurrency + backpressure + event loop fix
+25. `3d0fd05` — P0-07 security headers (CSP/X-Content-Type-Options/HSTS/Permissions-Policy)
 
