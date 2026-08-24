@@ -12,11 +12,12 @@ from app.document_engine.template_fill import fill_template, validate_required_f
 from app.document_engine.docx_renderer import render_docx
 from app.document_engine.pdf_renderer import render_pdf
 from app.document_engine.qa import DocumentQAError, check_docx, check_pdf
-from app.document_engine.ocr import OcrError, extract_text_from_image
+from app.document_engine.ocr import OcrError, extract_text_from_image, MAX_IMAGE_BYTES
 from app.document_engine.import_reader import (
     ImportError_,
     extract_text_from_docx_file,
     extract_text_from_pdf_file,
+    MAX_IMPORT_BYTES,
 )
 from app.ai.provider import ai_is_configured
 from app.repositories import conversation_repository as conv_repo
@@ -24,6 +25,7 @@ from app.document_intelligence.agent import DocumentAgent, ConversationState
 from app.document_intelligence.analyzer import analyze_document
 from app.document_intelligence.ocr_autofill import suggest_field_values
 from app.document_engine.version_diff import diff_content_blocks, diff_result_to_dict
+from app.utils.upload_limits import read_upload_with_limit
 from app.utils.errors import api_error
 from fastapi import status
 
@@ -244,7 +246,7 @@ async def ocr_image(
     надёжно — деньги/дата/срок/телефон/email), а не просто отдаёт текст
     для ручного переноса.
     """
-    data = await file.read()
+    data = await read_upload_with_limit(file, MAX_IMAGE_BYTES, "Файл слишком большой (максимум 10 МБ).")
     try:
         text = extract_text_from_image(data, content_type=file.content_type)
     except OcrError as exc:
@@ -491,7 +493,7 @@ async def import_document(
     извлечение текста (python-docx/pypdf) — без AI-понимания структуры,
     без AI-улучшений (см. app/ai/provider.py, недоступно без ключа).
     """
-    data = await file.read()
+    data = await read_upload_with_limit(file, MAX_IMPORT_BYTES, "Файл слишком большой (максимум 15 МБ).")
     filename = (file.filename or "").lower()
 
     try:
