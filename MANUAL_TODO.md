@@ -178,10 +178,26 @@ dashboard, я не могу подтвердить, что там реально
 держать DB-connection во время CPU-heavy work (частично уже сделано
 в idempotency.py, `a169b9b`), background jobs для тяжёлых OCR/export.
 
-### P2 — Scale (FTS вместо ILIKE, retention/cleanup idempotency-ключей, connection budget)
-Не реализовано — имеет смысл делать по факту реальной нагрузки, а не
-превентивно на пустой БД (аудит сам это подтверждает: "в реальной БД
-сейчас очень маленький объём данных... масштаб не доказан").
+### P2 — Scale — ЧАСТИЧНО ИСПРАВЛЕНО, 23.08.2026
+- **F-017 (FTS вместо ILIKE)** — `b7d47e2`. `search_text` STORED
+  tsvector-колонка + GIN-индекс, безопасная токенизация запроса в
+  Python (`_build_prefix_tsquery`), проверено вживую на реальной БД.
+- **Retention/cleanup** — `855e176` + `b134762`. pg_cron установлен,
+  3 ежедневных job'а: idempotency-ключи (7 дней), expired/revoked
+  shares (30 дней после истечения), rate-limit окна (3 дня). Все
+  проверены вживую (job'ы active=true, функции вызваны вручную без
+  ошибок).
+- **Pagination** — `935e8aa`. `GET /documents` и `GET /notifications`
+  теперь с `page`/`page_size` (лимит 200), defense-in-depth (капается
+  и в роутере, и в repo-функции). Обратно совместимо — фронтенд пока
+  не передаёт эти параметры, но граница на будущее есть.
+
+**Осталось из P2:** connection budget (общий лимит соединений к БД на
+весь деплой при N инстансов Railway), compound indexes по факту
+реальных query plans (аудит сам говорит не делать это превентивно —
+"в реальной БД сейчас очень маленький объём данных... масштаб не
+доказан"), frontend UI для "следующей страницы" (infinite scroll/кнопка
+"Ещё") — backend готов, фронтенд пока нет.
 
 ### P3 — Frontend (разбить AiDocsApp.tsx, E2E Playwright, visual regression)
 Не сделано. `AiDocsApp.tsx` действительно большой (~58KB) — разбиение
@@ -258,4 +274,8 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 15. `212a095` — P4 Admin panel UI
 16. `7430c9d` — F-012/F-013 retry policy + download timeout/401-recovery
 17. `06d14f1` — security.view (rate-limit hits) + shares.revoke эндпоинты
+18. `b7d47e2` — F-017 FTS вместо ILIKE (search_text tsvector + GIN)
+19. `855e176` — retention/cleanup для idempotency-ключей (pg_cron)
+20. `b134762` — retention/cleanup для expired shares и rate-limit окон
+21. `935e8aa` — пагинация GET /documents и GET /notifications
 
