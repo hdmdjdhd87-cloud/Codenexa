@@ -171,12 +171,25 @@ Idempotency-Key; exponential backoff+jitter; не ретраит семанти�
 (раньше не было ни того, ни другого — мог зависнуть навсегда). 18
 новых тестов.
 
+**F-006 — ИСПРАВЛЕНО, 24.08.2026** (см. `32c6753`): `POST /ocr` и
+`POST /documents/import` раньше делали `await file.read()` целиком до
+проверки размера — гигантский файл сначала полностью съедал память
+процесса и только потом получал отказ. Новый `read_upload_with_limit()`
+читает чанками по 256KB, прерывается сразу при превышении лимита.
+Честная граница: это app-level защита, не замена reverse-proxy
+body-size limit — если перед приложением стоит Railway/nginx без
+собственного лимита, входящий трафик всё ещё расходуется до этого кода
+(нужна отдельная инфраструктурная настройка, не в этом репозитории).
+6 новых тестов, включая regression-тест на раннее прерывание чтения
+50MB "файла" на кастомном потоке с подсчётом реально прочитанных байт.
+
 **Осталось из P1:** circuit breaker/backpressure для AI/OCR, `/health`
 vs `/ready` разделение (F-011 уже поправлен параллельной сессией — см.
 `50c9380` — но стоит перепроверить `railway.json` живьём в Railway
 dashboard, я не могу подтвердить, что там реально настроено), не
 держать DB-connection во время CPU-heavy work (частично уже сделано
-в idempotency.py, `a169b9b`), background jobs для тяжёлых OCR/export.
+в idempotency.py, `a169b9b`), background jobs для тяжёлых OCR/export,
+body-size limit на уровне reverse-proxy/Railway (вне этого репозитория).
 
 ### P2 — Scale — ЧАСТИЧНО ИСПРАВЛЕНО, 23.08.2026
 - **F-017 (FTS вместо ILIKE)** — `b7d47e2`. `search_text` STORED
@@ -287,4 +300,5 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 20. `b134762` — retention/cleanup для expired shares и rate-limit окон
 21. `935e8aa` — пагинация GET /documents и GET /notifications
 22. `cf11365` — разбит AiDocsApp.tsx на 8 feature-модулей
+23. `32c6753` — F-006 streaming upload с ранним прерыванием по размеру
 
