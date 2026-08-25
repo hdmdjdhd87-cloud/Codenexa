@@ -200,7 +200,30 @@ SameSite cookie вместо localStorage JWT (сейчас `codenexa.session_to
 (`dict(parse_qsl(...))` теряет повторяющиеся ключи — Telegram initData
 не содержит повторяющихся ключей по спецификации, риск теоретический).
 
-### P1 — Reliability по остальным пунктам
+### P0-05 — Upload security (zip-bomb, page limits) — ИСПРАВЛЕНО, 24.08.2026
+- DOCX (ZIP-архив): `_check_docx_zip_safety()` — 3 проверки через
+  ZIP-метаданные ДО реальной распаковки (число entries ≤2000,
+  суммарный распакованный размер ≤200MB, коэффициент сжатия на entry
+  ≤100x). Протестировано на реально сконструированном zip-bomb (5MB
+  повторяющихся данных в компактном сжатом entry) — корректно отклонён.
+- PDF: `len(reader.pages)` ≤500, проверяется до тяжёлого извлечения
+  текста.
+- Изображения (OCR): Pillow's decompression bomb protection
+  (`Image.MAX_IMAGE_PIXELS`) — уже была активна по умолчанию,
+  задокументирована явно + regression-тест, что её никто не отключил.
+- 9 новых тестов. Полный набор: 266 passed / 1 failed (предсуществующий
+  флейк).
+
+**Осталось из P0-05:** allowlist MIME+extension+magic-byte sniffing как
+ЕДИНАЯ переиспользуемая проверка (сейчас OCR и import проверяют по
+отдельности, каждый через реальный parse библиотекой — Pillow's
+`Image.open().load()` и python-docx/pypdf уже эффективно делают
+"magic-byte sniffing" через настоящий парсинг содержимого, а не
+доверие Content-Type/расширению, так что риск подмены типа уже низкий,
+но нет единого явного "allowlist"-слоя как отдельного примитива);
+DOCX relationship/resource checks (проверка на подозрительные внешние
+ссылки/relationships внутри DOCX XML) — не реализовано; антивирус/CDR
+для будущего масштаба — явно не в scope этой сессии.### P1 — Reliability по остальным пунктам
 **F-012/F-013 — ИСПРАВЛЕНО, 23.08.2026** (см. `7430c9d`): safe retry
 policy для `apiRequest` (GET/HEAD всегда, мутации — только с
 Idempotency-Key; exponential backoff+jitter; не ретраит семантические
@@ -352,4 +375,5 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 24. `9363d4c` — P1 OCR bounded concurrency + backpressure + event loop fix
 25. `3d0fd05` — P0-07 security headers (CSP/X-Content-Type-Options/HSTS/Permissions-Policy)
 26. `4105e4a` — P0-03 JWT algorithm allowlist + initData TTL 24ч→1ч
+27. `2d101b5` — P0-05 zip-bomb detection (DOCX) + page limit (PDF)
 
