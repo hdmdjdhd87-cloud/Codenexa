@@ -30,6 +30,7 @@ export function DocumentListView({
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 250);
   const documents = useAiDocsDocuments(debouncedQuery);
+  const allDocs = documents.data?.pages.flat() ?? [];
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "favorites" | "recent">("all");
@@ -103,15 +104,15 @@ export function DocumentListView({
 
       {documents.isLoading && <ModuleListSkeleton count={3} />}
       {documents.isError && <ErrorState message="Не удалось загрузить документы." onRetry={() => documents.refetch()} />}
-      {documents.data && filteredDocuments(documents.data, filter).length === 0 && (
+      {documents.data && filteredDocuments(allDocs, filter).length === 0 && (
         <EmptyState
           title={query ? "Ничего не найдено" : "Здесь пока ничего нет"}
           description={query ? "Попробуйте другой запрос." : "Создайте первый документ по шаблону выше."}
         />
       )}
-      {documents.data && filteredDocuments(documents.data, filter).length > 0 && (
+      {documents.data && filteredDocuments(allDocs, filter).length > 0 && (
         <div className="flex flex-col gap-2">
-          {filteredDocuments(documents.data, filter).map((doc) => (
+          {filteredDocuments(allDocs, filter).map((doc) => (
             <button
               key={doc.id}
               onClick={() => onOpen(doc.id)}
@@ -129,6 +130,15 @@ export function DocumentListView({
               <span className="text-text-secondary/40 text-[16px] shrink-0">›</span>
             </button>
           ))}
+          {documents.hasNextPage && (
+            <button
+              onClick={() => documents.fetchNextPage()}
+              disabled={documents.isFetchingNextPage}
+              className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-secondary text-[12.5px] font-semibold disabled:opacity-60"
+            >
+              {documents.isFetchingNextPage ? "Загружаем…" : "Показать ещё"}
+            </button>
+          )}
         </div>
       )}
     </div>

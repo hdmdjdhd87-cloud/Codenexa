@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { aidocsService } from "@/services/aidocsService";
 
 export function useAiStatus() {
@@ -10,9 +10,22 @@ export function useAiDocsTemplates() {
 }
 
 export function useAiDocsDocuments(search?: string) {
-  return useQuery({
+  // P2 из аудита 22.08.2026 ("Добавить pagination во все потенциально
+  // большие списки"): backend уже поддерживает page/page_size
+  // (см. GET /api/v1/aidocs/documents), useInfiniteQuery — идиоматичный
+  // React Query способ отдать фронтенду "Показать ещё" без ручного
+  // управления состоянием страницы.
+  return useInfiniteQuery({
     queryKey: ["aidocs", "documents", search ?? ""],
-    queryFn: () => aidocsService.documents(search),
+    queryFn: ({ pageParam }) => aidocsService.documents(search, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      // Backend отдаёt page_size=100 по умолчанию (см. router) — если
+      // последняя страница набрала меньше этого, следующей точно нет
+      // смысла запрашивать (последняя строка, а не 100 = полная).
+      const DEFAULT_PAGE_SIZE = 100;
+      return lastPage.length < DEFAULT_PAGE_SIZE ? undefined : allPages.length + 1;
+    },
   });
 }
 

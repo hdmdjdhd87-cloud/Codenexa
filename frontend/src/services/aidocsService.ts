@@ -104,8 +104,10 @@ function newIdempotencyKey(): string {
 export const aidocsService = {
   status: () => apiRequest<{ ai_available: boolean }>("/api/v1/aidocs/status"),
   templates: () => apiRequest<AiDocsTemplate[]>("/api/v1/aidocs/templates"),
-  documents: (search?: string) =>
-    apiRequest<AiDocsDocument[]>(`/api/v1/aidocs/documents${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+  documents: (search?: string, page = 1) =>
+    apiRequest<AiDocsDocument[]>(
+      `/api/v1/aidocs/documents?page=${page}${search ? `&search=${encodeURIComponent(search)}` : ""}`
+    ),
   document: (id: string) => apiRequest<AiDocsDocument>(`/api/v1/aidocs/documents/${id}`),
   versions: (id: string) => apiRequest<AiDocsVersion[]>(`/api/v1/aidocs/documents/${id}/versions`),
   restoreVersion: (id: string, versionId: string) =>

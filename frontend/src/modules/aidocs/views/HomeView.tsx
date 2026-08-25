@@ -22,9 +22,15 @@ export function AiDocsHomeView({
   const [quickInput, setQuickInput] = useState("");
   const [draftDismissed, setDraftDismissed] = useState(false);
 
-  const total = documents.data?.length ?? 0;
-  const favoritesCount = (documents.data ?? []).filter((d) => d.is_favorite).length;
-  const lastDoc = (documents.data ?? [])[0]; // список уже отсортирован backend'ом по updated_at desc
+  // useInfiniteQuery по умолчанию грузит только первую страницу — Home
+  // не вызывает fetchNextPage, так что здесь ровно то же поведение, что
+  // было раньше с плоским useQuery (счётчики по первой странице, не
+  // истинный global count при >page_size документов — та же
+  // ограниченность, что и до перехода на pagination, не регрессия).
+  const allDocs = documents.data?.pages.flat() ?? [];
+  const total = allDocs.length;
+  const favoritesCount = allDocs.filter((d) => d.is_favorite).length;
+  const lastDoc = allDocs[0]; // список уже отсортирован backend'ом по updated_at desc
 
   // Незавершённый диалог создания документа (п.6 промпта): backend уже
   // хранит состояние (nexa_docs_conversations), но раньше фронтенд его
