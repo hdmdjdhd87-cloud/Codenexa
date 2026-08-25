@@ -223,7 +223,39 @@ SameSite cookie вместо localStorage JWT (сейчас `codenexa.session_to
 но нет единого явного "allowlist"-слоя как отдельного примитива);
 DOCX relationship/resource checks (проверка на подозрительные внешние
 ссылки/relationships внутри DOCX XML) — не реализовано; антивирус/CDR
-для будущего масштаба — явно не в scope этой сессии.### P1 — Reliability по остальным пунктам
+для будущего масштаба — явно не в scope этой сессии.
+
+### P0-02/BOLA — IDOR-защита (static analysis + ручная проверка) — 24.08.2026
+Аудит требовал "2 users × every GET/PATCH/DELETE/restore/share/export
+endpoint" — честно: полноценные АВТОМАТИЗИРОВАННЫЕ 2-users HTTP-тесты
+не реализованы (нет живого Postgres в CI/песочнице для pytest,
+TestClient + dependency_overrides без реальной БД не даёт полной
+уверенности). Сделано два частичных, но реальных шага:
+- `tests/backend/test_idor_static_analysis.py` — 3 static-analysis
+  теста через `ast`-парсинг исходника `aidocs_repository.py`: каждая
+  функция с `user_id` в сигнатуре обязана реально использовать его в
+  теле (не только объявить параметр); каждая функция с
+  `document_id`/`share_id`/`version_id` обязана иметь `user_id`, если
+  не в explicit allowlist (публичный share-доступ по токену). Проверено
+  вручную, что тест ловит регрессию (смоделированная "сломанная" версия
+  `delete_document()` даёт 1 упоминание `user_id` вместо ≥2).
+- **Разовая ручная проверка на реальной Supabase**: созданы 2 тестовых
+  пользователя + документ от A, тот же SQL-паттерн, что использует
+  `get_document()`/`delete_document()`, выполнен от лица B —
+  подтверждено: `SELECT` вернул пустой результат, `DELETE` затронул 0
+  строк, документ выжил. Позитивный контроль (запрос с `user_id=A`)
+  корректно вернул документ. Все тестовые данные полностью удалены и
+  отсутствие подтверждено повторным запросом (0 leftover).
+
+**Осталось:** это НЕ заменяет постоянное автоматизированное покрытие —
+разовая проверка доказывает, что защита работала В ТОТ момент, не
+гарантирует, что будущие изменения её не сломают (для этого и нужен
+static-analysis тест выше, но он ловит только "забыли user_id в SQL",
+не более тонкие логические ошибки в WHERE-условиях). Полноценный
+integration-test suite против реального/тестового Postgres — отдельная
+задача, требующая настройки CI с Postgres-сервисом.
+
+### P1 — Reliability по остальным пунктам
 **F-012/F-013 — ИСПРАВЛЕНО, 23.08.2026** (см. `7430c9d`): safe retry
 policy для `apiRequest` (GET/HEAD всегда, мутации — только с
 Idempotency-Key; exponential backoff+jitter; не ретраит семантические
@@ -376,4 +408,5 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 25. `3d0fd05` — P0-07 security headers (CSP/X-Content-Type-Options/HSTS/Permissions-Policy)
 26. `4105e4a` — P0-03 JWT algorithm allowlist + initData TTL 24ч→1ч
 27. `2d101b5` — P0-05 zip-bomb detection (DOCX) + page limit (PDF)
+28. `46aa3b4` — P0-02/BOLA static IDOR-анализ + ручная 2-users проверка на реальной БД
 
