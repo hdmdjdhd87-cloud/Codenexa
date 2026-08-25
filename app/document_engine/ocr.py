@@ -23,6 +23,16 @@ from PIL import Image, UnidentifiedImageError
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
+# P0-05 из аудита 22.08.2026: "Image limits: max pixels, width/height,
+# frames, decompression ratio". Pillow уже защищает от decompression
+# bomb ПО УМОЛЧАНИЮ через Image.MAX_IMAGE_PIXELS (~89 млн пикселей,
+# PIL.Image.DecompressionBombError при превышении) — это НЕ добавленная
+# нами защита, а существующее поведение библиотеки, которое легко
+# случайно сломать (частая "починка" предупреждения — выставить
+# `Image.MAX_IMAGE_PIXELS = None`, что полностью ОТКЛЮЧАЕТ проверку).
+# Явно документируем это здесь и покрываем regression-тестом, чтобы
+# никто не отключил защиту, "чтобы убрать warning".
+
 # P1 из аудита 22.08.2026: "OCR/export выполнять с bounded concurrency;
 # иначе N одновременных изображений могут занять CPU/RAM" + "Ввести
 # backpressure: 429/503 + Retry-After, а не бесконечное ожидание".
