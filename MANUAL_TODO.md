@@ -173,6 +173,33 @@ Permissions-Policy (blocked geolocation/camera/microphone — не
 preflight, не только на успешные ответы (проверено явно). 6 новых
 тестов, полный набор: 250 passed / 1 failed (предсуществующий флейк).
 
+### P0-03 — Auth hardening (JWT algorithm allowlist + initData TTL) — ИСПРАВЛЕНО, 24.08.2026
+- JWT: `jose.jwt.decode()` уже вызывался с ОДНИМ алгоритмом (не
+  списком/wildcard — classic alg-confusion атака и так была
+  неприменима), но не было fail-fast защиты от случайного
+  `JWT_ALGORITHM=none` в конфиге. `Settings.jwt_algorithm` теперь
+  `field_validator` с allowlist `{HS256, HS384, HS512}` — невалидное
+  значение падает при старте приложения, не тихо посреди запроса.
+- initData TTL: 24 часа → 1 час. Telegram выдаёт свежий initData на
+  каждый launch Mini App — легитимный `auth_date` почти всегда секунды,
+  не часы; 24ч был неоправданно широким replay-окном для перехваченной
+  строки. UX-риск минимален.
+- 13 новых тестов. Полный набор: 257 passed / 1 failed
+  (предсуществующий флейк).
+
+**Осталось из раздела 5 аудита (Authentication/Telegram):** server-side
+session/revocation для АДМИНСКИХ сессий отдельно от обычных (сейчас
+revoke-sessions одинаков для всех — работает, но не выделен отдельный,
+более строгий контроль именно для админ-аккаунтов), HttpOnly Secure
+SameSite cookie вместо localStorage JWT (сейчас `codenexa.session_token`
+в localStorage — архитектурное решение, замена на cookie потребовала
+бы менять весь auth-flow, не точечная правка), token/session versioning
+для глобального logout (сейчас есть `sessions_valid_from` — по сути
+это уже примитивная версия этого механизма, полноценный versioning
+с историей был бы избыточен), duplicate query params в initData
+(`dict(parse_qsl(...))` теряет повторяющиеся ключи — Telegram initData
+не содержит повторяющихся ключей по спецификации, риск теоретический).
+
 ### P1 — Reliability по остальным пунктам
 **F-012/F-013 — ИСПРАВЛЕНО, 23.08.2026** (см. `7430c9d`): safe retry
 policy для `apiRequest` (GET/HEAD всегда, мутации — только с
@@ -324,4 +351,5 @@ Backend: ≈159 тестов (было 144, +15 после аудита). Fronte
 23. `32c6753` — F-006 streaming upload с ранним прерыванием по размеру
 24. `9363d4c` — P1 OCR bounded concurrency + backpressure + event loop fix
 25. `3d0fd05` — P0-07 security headers (CSP/X-Content-Type-Options/HSTS/Permissions-Policy)
+26. `4105e4a` — P0-03 JWT algorithm allowlist + initData TTL 24ч→1ч
 
