@@ -25,7 +25,7 @@ function AppShell() {
   useApplyTheme(settings.data?.theme);
 
   return (
-    <div className="min-h-screen pb-[64px]">
+    <div className="min-h-screen pb-[64px] pt-[env(safe-area-inset-top)]">
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/catalog" element={<CatalogPage />} />

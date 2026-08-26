@@ -70,3 +70,15 @@ html, body {
   overflow-x: hidden;
   max-width: 100vw;
 }
+
+/* ============================================================
+   Safe-area tokens (Design System 2.0, п.4 UI/UX-спецификации).
+   Раньше top safe-area не был учтён НИГДЕ в кодовой базе (проверено
+   grep'ом по всему frontend/src) — на iOS с notch/Dynamic Island
+   контент мог упираться под системную область. --cn-safe-top
+   используется как paddingTop у AppShell (см. App.tsx).
+   ============================================================ */
+:root {
+  --cn-safe-top: env(safe-area-inset-top, 0px);
+  --cn-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
