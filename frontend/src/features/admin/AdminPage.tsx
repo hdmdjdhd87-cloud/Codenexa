@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { adminService, type AdminUser } from "@/services/adminService";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { haptic } from "@/lib/telegram";
@@ -234,8 +235,8 @@ function UserDetail({
 
   return (
     <div>
-      <button onClick={onBack} className="text-accent text-[13px] font-semibold mb-4">
-        ← К списку
+      <button onClick={onBack} className="flex items-center gap-1 text-accent text-[13px] font-semibold mb-4">
+        <ArrowLeft size={16} aria-hidden="true" /> К списку
       </button>
 
       <div className="rounded-xl bg-surface border border-border p-4 mb-4">

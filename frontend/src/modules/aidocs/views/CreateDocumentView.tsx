@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { haptic } from "@/lib/telegram";
 import { aidocsService, type AiDocsTemplate } from "@/services/aidocsService";
 import { useCreateAiDoc } from "../hooks";
@@ -82,7 +83,7 @@ export function CreateDocumentView({
           нужное в поля ниже. */}
       <div className="rounded-xl bg-surface border border-border p-3.5 mb-4">
         <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-text-secondary text-[12.5px] font-medium cursor-pointer">
-          📷 Загрузить фото/скан для распознавания текста
+          <Camera size={16} aria-hidden="true" /> Загрузить фото/скан для распознавания текста
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"

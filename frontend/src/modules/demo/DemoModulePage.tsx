@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { CheckCircle2 } from "lucide-react";
 import t from "@/i18n";
 import { hideBackButton, showBackButton } from "@/lib/telegram";
 
@@ -24,8 +25,8 @@ export function DemoModulePage() {
 
   return (
     <div className="px-4 pt-8 pb-6 flex flex-col items-center text-center">
-      <div className="w-16 h-16 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent text-[26px] font-semibold mb-5">
-        ✓
+      <div className="w-16 h-16 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent mb-5">
+        <CheckCircle2 size={28} aria-hidden="true" />
       </div>
       <h1 className="text-text-primary text-[19px] font-semibold">{t("demoModule.title")}</h1>
       <p className="text-text-secondary text-[14px] mt-2 max-w-[280px]">{t("demoModule.message")}</p>

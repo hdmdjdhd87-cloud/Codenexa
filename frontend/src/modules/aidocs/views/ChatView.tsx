@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Send } from "lucide-react";
 import { haptic } from "@/lib/telegram";
 import { aidocsService, type AiDocsConversation } from "@/services/aidocsService";
 
@@ -156,9 +157,9 @@ export function ChatView({
         <button
           type="submit"
           disabled={sending || !input.trim()}
-          className="shrink-0 w-10 h-10 rounded-xl bg-accent text-white font-semibold disabled:opacity-50"
+          className="shrink-0 w-10 h-10 rounded-xl bg-accent text-white font-semibold disabled:opacity-50 flex items-center justify-center"
         >
-          →
+          <Send size={16} aria-hidden="true" />
         </button>
       </form>
     </div>

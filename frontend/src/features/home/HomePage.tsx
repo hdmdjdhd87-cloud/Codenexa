@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Bell } from "lucide-react";
 import t from "@/i18n";
 import { useModules } from "@/hooks/useModules";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -58,15 +59,13 @@ export function HomePage() {
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <p className="text-text-secondary text-[13px]">{greetingByHour()}</p>
-          <h1 className="text-text-primary text-[22px] font-semibold mt-0.5 truncate">
-            {displayName} {user ? "👋" : ""}
-          </h1>
+          <h1 className="text-text-primary text-[22px] font-semibold mt-0.5 truncate">{displayName}</h1>
           {user?.username && <p className="text-text-secondary text-[13px] mt-0.5">@{user.username}</p>}
         </div>
         {user && (
           <div className="flex items-center gap-2 shrink-0">
             <Link to="/notifications" aria-label={t("notifications.title")} className="relative w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center">
-              <span aria-hidden="true">🔔</span>
+              <Bell size={18} aria-hidden="true" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-error text-white text-[9px] font-bold flex items-center justify-center">
                   {unreadCount > 9 ? "9+" : unreadCount}

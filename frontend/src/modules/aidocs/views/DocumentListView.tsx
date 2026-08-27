@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FileText, ChevronRight, Star } from "lucide-react";
 import { haptic } from "@/lib/telegram";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { aidocsService } from "@/services/aidocsService";
@@ -64,7 +65,13 @@ export function DocumentListView({
       </button>
 
       <label className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-surface border border-border text-text-primary text-[13px] font-semibold mb-4 cursor-pointer">
-        {importing ? "Импортируем…" : "📄 Загрузить документ (DOCX/PDF)"}
+        {importing ? (
+          "Импортируем…"
+        ) : (
+          <>
+            <FileText size={16} aria-hidden="true" /> Загрузить документ (DOCX/PDF)
+          </>
+        )}
         <input
           type="file"
           accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -121,13 +128,13 @@ export function DocumentListView({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-text-primary font-semibold text-[14px] truncate">{doc.title}</p>
-                  {doc.is_favorite && <span className="text-warning text-[12px]">★</span>}
+                  {doc.is_favorite && <Star size={13} className="text-warning" fill="currentColor" aria-hidden="true" />}
                 </div>
                 <p className="text-text-secondary text-[12px] mt-0.5">
                   {CATEGORY_LABELS[doc.doc_type] ?? doc.doc_type} · {formatDate(doc.updated_at)}
                 </p>
               </div>
-              <span className="text-text-secondary/40 text-[16px] shrink-0">›</span>
+              <span className="text-text-secondary/40 shrink-0"><ChevronRight size={18} aria-hidden="true" /></span>
             </button>
           ))}
           {documents.hasNextPage && (

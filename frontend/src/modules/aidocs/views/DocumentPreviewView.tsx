@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Star, Check, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { downloadAuthorizedFile } from "@/lib/apiClient";
 import { haptic } from "@/lib/telegram";
 import { aidocsService, type AiDocsAnalysis, type AiDocsVersionCompare } from "@/services/aidocsService";
@@ -207,11 +208,11 @@ export function DocumentPreviewView({
         )}
         <button
           onClick={() => toggleFav.mutate({ id: documentId, is_favorite: !d.is_favorite })}
-          className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[16px] ${
+          className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
             d.is_favorite ? "text-warning" : "text-text-secondary/50"
           }`}
         >
-          {d.is_favorite ? "★" : "☆"}
+          <Star size={17} fill={d.is_favorite ? "currentColor" : "none"} aria-hidden="true" />
         </button>
       </div>
       <p className="text-text-secondary text-[11px] mb-4">Нажмите на название, чтобы переименовать</p>
@@ -389,11 +390,11 @@ export function DocumentPreviewView({
                     </div>
                     {compareMode ? (
                       <span
-                        className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center text-[10px] ${
+                        className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center ${
                           selected ? "bg-accent border-accent text-white" : "border-border text-transparent"
                         }`}
                       >
-                        ✓
+                        <Check size={12} aria-hidden="true" />
                       </span>
                     ) : (
                       !isLatest &&
@@ -494,10 +495,10 @@ export function DocumentPreviewView({
 
 /* ============================= ANALYSIS ============================= */
 
-const ANALYSIS_STATUS_META: Record<string, { icon: string; label: string; color: string }> = {
-  pass: { icon: "🟢", label: "Замечаний нет", color: "text-success" },
-  warning: { icon: "🟡", label: "Есть на что обратить внимание", color: "text-warning" },
-  error: { icon: "🔴", label: "Требует исправлений", color: "text-error" },
+const ANALYSIS_STATUS_META: Record<string, { Icon: typeof CheckCircle2; label: string; color: string }> = {
+  pass: { Icon: CheckCircle2, label: "Замечаний нет", color: "text-success" },
+  warning: { Icon: AlertTriangle, label: "Есть на что обратить внимание", color: "text-warning" },
+  error: { Icon: XCircle, label: "Требует исправлений", color: "text-error" },
 };
 
 const SEVERITY_LABELS: Record<string, string> = {
@@ -512,7 +513,7 @@ function AnalysisResultCard({ result, onDismiss }: { result: AiDocsAnalysis; onD
     <div className="rounded-xl bg-surface border border-border p-3.5 mt-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-[18px] leading-none">{meta.icon}</span>
+          <meta.Icon size={18} className={meta.color} aria-hidden="true" />
           <p className={`text-[13px] font-semibold ${meta.color}`}>{meta.label}</p>
         </div>
         <button onClick={onDismiss} className="text-text-secondary text-[12px] shrink-0">

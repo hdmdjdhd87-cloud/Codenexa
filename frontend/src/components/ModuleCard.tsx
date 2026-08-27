@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Star, ChevronRight } from "lucide-react";
 import t from "@/i18n";
 import type { ModuleDefinition } from "@/types";
 import { haptic } from "@/lib/telegram";
@@ -85,17 +86,17 @@ export function ModuleCard({ module, isFavorite, onToggleFavorite }: ModuleCardP
             haptic("light");
             onToggleFavorite(module.id);
           }}
-          className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[15px] transition-colors ${
+          className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
             isFavorite ? "text-warning" : "text-text-secondary/50"
           }`}
         >
-          {isFavorite ? "★" : "☆"}
+          <Star size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" />
         </button>
       )}
 
       {!onToggleFavorite && !isComingSoon && (
-        <span className="text-text-secondary/40 text-[16px] shrink-0" aria-hidden="true">
-          ›
+        <span className="text-text-secondary/40 shrink-0" aria-hidden="true">
+          <ChevronRight size={18} />
         </span>
       )}
     </div>

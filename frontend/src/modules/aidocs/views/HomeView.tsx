@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import { haptic } from "@/lib/telegram";
 import { useAiDocsDocuments, useAiDocsActiveConversation } from "../hooks";
 import type { AiDocsConversation } from "@/services/aidocsService";
@@ -91,9 +92,9 @@ export function AiDocsHomeView({
           <button
             type="submit"
             onClick={() => haptic("light")}
-            className="px-4 py-2 rounded-xl bg-accent text-white text-[12.5px] font-semibold"
+            className="px-4 py-2 rounded-xl bg-accent text-white text-[12.5px] font-semibold flex items-center gap-1.5"
           >
-            Отправить →
+            Отправить <ArrowRight size={14} aria-hidden="true" />
           </button>
         </div>
       </form>
@@ -124,7 +125,7 @@ export function AiDocsHomeView({
               <p className="text-text-primary font-semibold text-[14px] truncate">{lastDoc.title}</p>
               <p className="text-text-secondary text-[12px] mt-0.5">{formatDate(lastDoc.updated_at)}</p>
             </div>
-            <span className="text-text-secondary/40 text-[16px] shrink-0">›</span>
+            <span className="text-text-secondary/40 shrink-0"><ChevronRight size={18} aria-hidden="true" /></span>
           </button>
         </div>
       )}

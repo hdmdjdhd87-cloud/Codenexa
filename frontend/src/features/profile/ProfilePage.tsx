@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 import t from "@/i18n";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -172,7 +173,7 @@ function LinkRow({ to, label }: { to: string; label: string }) {
   return (
     <RouterLink to={to} className="flex items-center justify-between px-4 py-3 text-[13.5px] font-medium text-text-primary">
       <span>{label}</span>
-      <span className="text-text-secondary">›</span>
+      <span className="text-text-secondary"><ChevronRight size={18} aria-hidden="true" /></span>
     </RouterLink>
   );
 }
