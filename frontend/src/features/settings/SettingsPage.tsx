@@ -30,7 +30,7 @@ export function SettingsPage() {
 
   return (
     <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-[20px] font-semibold mb-4">{t("settings.title")}</h1>
+      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("settings.title")}</h1>
 
       <SectionLabel>Внешний вид</SectionLabel>
       <div className="rounded-2xl bg-surface border border-border p-3">
@@ -39,7 +39,7 @@ export function SettingsPage() {
             <button
               key={opt}
               onClick={() => setTheme(opt)}
-              className={`flex-1 py-2.5 rounded-xl text-[12.5px] font-semibold border ${
+              className={`flex-1 py-2.5 rounded-xl text-cn-sm font-semibold border ${
                 s.theme === opt ? "bg-accent text-white border-accent" : "bg-surface-elevated text-text-secondary border-border"
               }`}
             >
@@ -61,7 +61,7 @@ export function SettingsPage() {
       </div>
 
       <SectionLabel>Приватность</SectionLabel>
-      <div className="rounded-2xl bg-surface border border-border p-4 text-text-secondary text-[12.5px] leading-relaxed">
+      <div className="rounded-2xl bg-surface border border-border p-4 text-text-secondary text-cn-sm leading-relaxed">
         CodeNexa хранит только данные, необходимые для работы приложения: профиль из Telegram, избранное, историю
         открытых модулей и настройки. Данные не передаются третьим лицам.
       </div>
@@ -69,24 +69,24 @@ export function SettingsPage() {
       <SectionLabel>Аккаунт</SectionLabel>
       <div className="rounded-2xl bg-surface border border-border overflow-hidden">
         {!confirmingLogout ? (
-          <button onClick={() => setConfirmingLogout(true)} className="w-full text-left px-4 py-3 text-[13.5px] font-medium text-error">
+          <button onClick={() => setConfirmingLogout(true)} className="w-full text-left px-4 py-3 text-cn-base font-medium text-error">
             Выйти
           </button>
         ) : (
           <div className="px-4 py-3">
-            <p className="text-text-secondary text-[12.5px] mb-2.5">
+            <p className="text-text-secondary text-cn-sm mb-2.5">
               Приложение закроется, при следующем запуске вы авторизуетесь автоматически через Telegram.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => { clearStoredToken(); closeMiniApp(); }}
-                className="flex-1 py-2 rounded-lg bg-error/15 text-error text-[12.5px] font-semibold"
+                className="flex-1 py-2 rounded-lg bg-error/15 text-error text-cn-sm font-semibold"
               >
                 Подтвердить
               </button>
               <button
                 onClick={() => setConfirmingLogout(false)}
-                className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold"
+                className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-cn-sm font-semibold"
               >
                 {t("common.cancel")}
               </button>
@@ -105,7 +105,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function RowStatic({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-text-primary text-[13.5px]">{label}</span>
+      <span className="text-text-primary text-cn-base">{label}</span>
       <span className="text-text-secondary text-[13px]">{value}</span>
     </div>
   );
@@ -114,7 +114,7 @@ function RowStatic({ label, value }: { label: string; value: string }) {
 function RowToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-text-primary text-[13.5px]">{label}</span>
+      <span className="text-text-primary text-cn-base">{label}</span>
       <button
         role="switch"
         aria-checked={checked}

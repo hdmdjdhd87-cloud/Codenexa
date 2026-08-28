@@ -49,7 +49,7 @@ export function ModuleCard({ module, isFavorite, onToggleFavorite }: ModuleCardP
               style={{ background: `radial-gradient(circle at 30% 20%, ${color.bg}55, transparent 70%)` }}
               aria-hidden="true"
             />
-            <span className="relative font-semibold text-[17px]" style={{ color: color.bg }}>
+            <span className="relative font-semibold text-cn-xl" style={{ color: color.bg }}>
               {module.name.charAt(0).toUpperCase()}
             </span>
           </>
@@ -58,7 +58,7 @@ export function ModuleCard({ module, isFavorite, onToggleFavorite }: ModuleCardP
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="text-text-primary font-semibold text-[14px] truncate">{module.name}</p>
+          <p className="text-text-primary font-semibold text-cn-md truncate">{module.name}</p>
           {isComingSoon && (
             <span className="text-[9.5px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-warning/15 text-warning shrink-0">
               {t("catalog.comingSoon")}
@@ -70,7 +70,7 @@ export function ModuleCard({ module, isFavorite, onToggleFavorite }: ModuleCardP
         )}
         {module.category && (
           <span
-            className="inline-block mt-1.5 text-[10px] font-medium px-1.5 py-[1px] rounded-md"
+            className="inline-block mt-1.5 text-cn-2xs font-medium px-1.5 py-[1px] rounded-md"
             style={{ background: color.tint, color: color.bg }}
           >
             {CATEGORY_LABELS[module.category] ?? module.category}

@@ -189,7 +189,7 @@ export function DocumentPreviewView({
               setRenameValue(d.title);
               setRenaming(true);
             }}
-            className="text-text-primary text-[17px] font-semibold min-w-0 truncate cursor-pointer"
+            className="text-text-primary text-cn-xl font-semibold min-w-0 truncate cursor-pointer"
           >
             {d.title}
           </h3>
@@ -203,7 +203,7 @@ export function DocumentPreviewView({
               setRenaming(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-            className="min-w-0 flex-1 bg-transparent border-b border-accent text-text-primary text-[17px] font-semibold outline-none"
+            className="min-w-0 flex-1 bg-transparent border-b border-accent text-text-primary text-cn-xl font-semibold outline-none"
           />
         )}
         <button
@@ -229,28 +229,28 @@ export function DocumentPreviewView({
             );
           if (block.type === "heading")
             return (
-              <p key={i} className="font-bold text-[13.5px] mt-3 mb-1">
+              <p key={i} className="font-bold text-cn-base mt-3 mb-1">
                 {block.text}
               </p>
             );
           if (block.type === "paragraph_right") return (
-            <p key={i} className="text-right text-[12.5px]">{block.text}</p>
+            <p key={i} className="text-right text-cn-sm">{block.text}</p>
           );
           if (block.type === "signature_line")
             return (
-              <p key={i} className="text-[12.5px] mt-4">
+              <p key={i} className="text-cn-sm mt-4">
                 {block.text} &nbsp;&nbsp; _______________
               </p>
             );
           return (
-            <p key={i} className="text-[12.5px] leading-relaxed text-justify my-1.5">
+            <p key={i} className="text-cn-sm leading-relaxed text-justify my-1.5">
               {block.text}
             </p>
           );
         })}
       </div>
 
-      {downloadError && <p className="text-error text-[12.5px] mt-3">{downloadError}</p>}
+      {downloadError && <p className="text-error text-cn-sm mt-3">{downloadError}</p>}
 
       <div className="grid grid-cols-2 gap-2 mt-4">
         <button
@@ -272,14 +272,14 @@ export function DocumentPreviewView({
       <div className="mt-2">
         <button
           onClick={onEditViaChat}
-          className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary text-[12.5px] font-semibold mb-2"
+          className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary text-cn-sm font-semibold mb-2"
         >
           Изменить через чат
         </button>
         <button
           onClick={handleAnalyze}
           disabled={analyze.isPending}
-          className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary text-[12.5px] font-semibold disabled:opacity-60"
+          className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary text-cn-sm font-semibold disabled:opacity-60"
         >
           {analyze.isPending ? "Проверяем…" : "Анализировать документ"}
         </button>
@@ -291,13 +291,13 @@ export function DocumentPreviewView({
         <button
           onClick={handleDuplicate}
           disabled={duplicate.isPending}
-          className="py-2.5 rounded-xl bg-surface border border-border text-text-primary text-[12.5px] font-semibold disabled:opacity-60"
+          className="py-2.5 rounded-xl bg-surface border border-border text-text-primary text-cn-sm font-semibold disabled:opacity-60"
         >
           {duplicate.isPending ? "Копируем…" : "Создать копию"}
         </button>
         <button
           onClick={() => setShareOpen((v) => !v)}
-          className="py-2.5 rounded-xl bg-surface border border-border text-text-primary text-[12.5px] font-semibold"
+          className="py-2.5 rounded-xl bg-surface border border-border text-text-primary text-cn-sm font-semibold"
         >
           Поделиться
         </button>
@@ -315,14 +315,14 @@ export function DocumentPreviewView({
                 <button
                   onClick={() => handleShare(7)}
                   disabled={shareLoading}
-                  className="flex-1 py-2 rounded-lg bg-accent text-white text-[12.5px] font-semibold disabled:opacity-60"
+                  className="flex-1 py-2 rounded-lg bg-accent text-white text-cn-sm font-semibold disabled:opacity-60"
                 >
                   {shareLoading ? "Создаём…" : "На 7 дней"}
                 </button>
                 <button
                   onClick={() => handleShare(null)}
                   disabled={shareLoading}
-                  className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold disabled:opacity-60"
+                  className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-cn-sm font-semibold disabled:opacity-60"
                 >
                   Бессрочно
                 </button>
@@ -331,14 +331,14 @@ export function DocumentPreviewView({
             </>
           ) : (
             <>
-              <p className="text-text-secondary text-[11.5px] mb-1.5">Ссылка готова:</p>
-              <div className="rounded-lg bg-surface-elevated p-2.5 text-[11.5px] text-accent break-all">{shareLink}</div>
+              <p className="text-text-secondary text-cn-xs mb-1.5">Ссылка готова:</p>
+              <div className="rounded-lg bg-surface-elevated p-2.5 text-cn-xs text-accent break-all">{shareLink}</div>
               <button
                 onClick={() => {
                   navigator.clipboard?.writeText(shareLink);
                   haptic("success");
                 }}
-                className="w-full mt-2 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold"
+                className="w-full mt-2 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-cn-sm font-semibold"
               >
                 Скопировать
               </button>
@@ -382,7 +382,7 @@ export function DocumentPreviewView({
                     onClick={compareMode ? () => toggleCompareSelection(v.id) : undefined}
                   >
                     <div className="min-w-0">
-                      <p className="text-text-primary text-[12.5px] font-medium truncate">
+                      <p className="text-text-primary text-cn-sm font-medium truncate">
                         Версия {v.version_number} {isLatest && "· текущая"}
                         {v.note ? ` — ${v.note}` : ""}
                       </p>
@@ -411,7 +411,7 @@ export function DocumentPreviewView({
 
                   {!compareMode && restoringVersionId === v.id && (
                     <div className="mt-2.5 pt-2.5 border-t border-border/60">
-                      <p className="text-text-secondary text-[11.5px] mb-2">
+                      <p className="text-text-secondary text-cn-xs mb-2">
                         Текущее содержимое документа будет заменено версией {v.version_number}. Это создаст новую
                         версию в истории — старые версии не удаляются.
                       </p>
@@ -446,7 +446,7 @@ export function DocumentPreviewView({
               <button
                 onClick={handleCompare}
                 disabled={compareSelection.length !== 2 || compareVersions.isPending}
-                className="w-full py-2.5 rounded-xl bg-accent text-white text-[12.5px] font-semibold disabled:opacity-60"
+                className="w-full py-2.5 rounded-xl bg-accent text-white text-cn-sm font-semibold disabled:opacity-60"
               >
                 {compareVersions.isPending
                   ? "Сравниваем…"
@@ -468,20 +468,20 @@ export function DocumentPreviewView({
           </button>
         ) : (
           <div className="rounded-xl bg-surface border border-border p-3.5">
-            <p className="text-text-secondary text-[12.5px] mb-2.5">Документ будет удалён безвозвратно.</p>
+            <p className="text-text-secondary text-cn-sm mb-2.5">Документ будет удалён безвозвратно.</p>
             <div className="flex gap-2">
               <button
                 onClick={async () => {
                   await del.mutateAsync(documentId);
                   onDeleted();
                 }}
-                className="flex-1 py-2 rounded-lg bg-error/15 text-error text-[12.5px] font-semibold"
+                className="flex-1 py-2 rounded-lg bg-error/15 text-error text-cn-sm font-semibold"
               >
                 Подтвердить
               </button>
               <button
                 onClick={() => setConfirmingDelete(false)}
-                className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold"
+                className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-cn-sm font-semibold"
               >
                 Отмена
               </button>
@@ -527,7 +527,7 @@ function AnalysisResultCard({ result, onDismiss }: { result: AiDocsAnalysis; onD
             <div key={i} className="rounded-lg bg-surface-elevated border border-border p-2.5">
               <div className="flex items-center gap-1.5 mb-1">
                 <span
-                  className={`text-[10px] font-semibold uppercase tracking-wide ${
+                  className={`text-cn-2xs font-semibold uppercase tracking-wide ${
                     issue.severity === "error"
                       ? "text-error"
                       : issue.severity === "warning"
@@ -537,10 +537,10 @@ function AnalysisResultCard({ result, onDismiss }: { result: AiDocsAnalysis; onD
                 >
                   {SEVERITY_LABELS[issue.severity] ?? issue.severity}
                 </span>
-                <span className="text-text-secondary text-[10px]">· {issue.category}</span>
+                <span className="text-text-secondary text-cn-2xs">· {issue.category}</span>
               </div>
-              <p className="text-text-primary text-[12.5px]">{issue.message}</p>
-              {issue.suggestion && <p className="text-text-secondary text-[11.5px] mt-1">{issue.suggestion}</p>}
+              <p className="text-text-primary text-cn-sm">{issue.message}</p>
+              {issue.suggestion && <p className="text-text-secondary text-cn-xs mt-1">{issue.suggestion}</p>}
             </div>
           ))}
         </div>
@@ -559,10 +559,10 @@ function VersionCompareResult({ result }: { result: AiDocsVersionCompare }) {
   const { summary, blocks } = result.diff;
   return (
     <div className="rounded-xl bg-surface border border-border p-3.5 mt-2.5">
-      <p className="text-text-secondary text-[11.5px] mb-2">
+      <p className="text-text-secondary text-cn-xs mb-2">
         Версия {result.from.version_number} → Версия {result.to.version_number}
       </p>
-      <div className="flex gap-3 mb-3 text-[11.5px]">
+      <div className="flex gap-3 mb-3 text-cn-xs">
         <span className="text-success">+{summary.added}</span>
         <span className="text-error">−{summary.removed}</span>
         <span className="text-warning">~{summary.changed}</span>

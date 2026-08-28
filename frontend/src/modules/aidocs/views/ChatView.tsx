@@ -94,7 +94,7 @@ export function ChatView({
     <div className="flex flex-col" style={{ height: "calc(100vh - 140px)" }}>
       {documentId && onDocumentEdited && (
         <div className="flex justify-end mb-2">
-          <button onClick={() => onDocumentEdited(documentId)} className="text-accent text-[12.5px] font-semibold">
+          <button onClick={() => onDocumentEdited(documentId)} className="text-accent text-cn-sm font-semibold">
             Готово, вернуться к документу
           </button>
         </div>
@@ -103,7 +103,7 @@ export function ChatView({
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-line ${
+            className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-cn-base leading-relaxed whitespace-pre-line ${
               m.role === "user" ? "self-end bg-accent text-white" : "self-start bg-surface border border-border text-text-primary"
             }`}
           >
@@ -152,7 +152,7 @@ export function ChatView({
           }}
           rows={1}
           placeholder="Напишите сообщение…"
-          className="flex-1 rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-secondary outline-none resize-none focus:border-accent"
+          className="flex-1 rounded-xl bg-surface border border-border px-3.5 py-2.5 text-cn-base text-text-primary placeholder:text-text-secondary outline-none resize-none focus:border-accent"
         />
         <button
           type="submit"

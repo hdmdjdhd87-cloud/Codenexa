@@ -29,7 +29,7 @@ export function DemoModulePage() {
         <CheckCircle2 size={28} aria-hidden="true" />
       </div>
       <h1 className="text-text-primary text-[19px] font-semibold">{t("demoModule.title")}</h1>
-      <p className="text-text-secondary text-[14px] mt-2 max-w-[280px]">{t("demoModule.message")}</p>
+      <p className="text-text-secondary text-cn-md mt-2 max-w-[280px]">{t("demoModule.message")}</p>
     </div>
   );
 }

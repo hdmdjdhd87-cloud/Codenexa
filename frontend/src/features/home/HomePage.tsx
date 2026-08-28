@@ -78,13 +78,13 @@ export function HomePage() {
       </div>
 
       <section className="mt-6 rounded-2xl bg-surface-elevated border border-border p-5">
-        <h2 className="text-text-primary text-[17px] font-semibold">{t("home.heroTitle")}</h2>
+        <h2 className="text-text-primary text-cn-xl font-semibold">{t("home.heroTitle")}</h2>
         <p className="text-text-secondary text-[13px] mt-1">{t("home.heroSubtitle")}</p>
       </section>
 
       {recentlyUsed.length > 0 && (
         <section className="mt-5">
-          <h3 className="text-text-primary text-[14px] font-semibold mb-2.5">Недавно использовали</h3>
+          <h3 className="text-text-primary text-cn-md font-semibold mb-2.5">Недавно использовали</h3>
           <div className="flex flex-col gap-2">
             {recentlyUsed.map((item) => (
               <Link
@@ -93,10 +93,10 @@ export function HomePage() {
                 className="rounded-2xl bg-surface border border-border p-4 flex items-center justify-between"
               >
                 <div className="min-w-0">
-                  <p className="text-text-primary font-semibold text-[14px] truncate">{item.module_name}</p>
+                  <p className="text-text-primary font-semibold text-cn-md truncate">{item.module_name}</p>
                   <p className="text-text-secondary text-[12px] mt-0.5">{formatRecentTime(item.created_at)}</p>
                 </div>
-                <span className="text-accent text-[12.5px] font-semibold shrink-0 ml-3">{t("common.open")}</span>
+                <span className="text-accent text-cn-sm font-semibold shrink-0 ml-3">{t("common.open")}</span>
               </Link>
             ))}
           </div>

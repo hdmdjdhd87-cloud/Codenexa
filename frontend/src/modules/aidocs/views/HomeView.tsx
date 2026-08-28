@@ -56,13 +56,13 @@ export function AiDocsHomeView({
           <div className="flex gap-2">
             <button
               onClick={() => onResumeChat(draft)}
-              className="flex-1 py-2 rounded-lg bg-accent text-white text-[12.5px] font-semibold"
+              className="flex-1 py-2 rounded-lg bg-accent text-white text-cn-sm font-semibold"
             >
               Продолжить
             </button>
             <button
               onClick={() => setDraftDismissed(true)}
-              className="flex-1 py-2 rounded-lg bg-surface border border-border text-text-primary text-[12.5px] font-semibold"
+              className="flex-1 py-2 rounded-lg bg-surface border border-border text-text-primary text-cn-sm font-semibold"
             >
               Не сейчас
             </button>
@@ -86,13 +86,13 @@ export function AiDocsHomeView({
           onChange={(e) => setQuickInput(e.target.value)}
           placeholder="Что нужно сделать с документом?"
           rows={2}
-          className="w-full bg-transparent text-text-primary text-[13.5px] placeholder:text-text-secondary outline-none resize-none"
+          className="w-full bg-transparent text-text-primary text-cn-base placeholder:text-text-secondary outline-none resize-none"
         />
         <div className="flex justify-end mt-1">
           <button
             type="submit"
             onClick={() => haptic("light")}
-            className="px-4 py-2 rounded-xl bg-accent text-white text-[12.5px] font-semibold flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-accent text-white text-cn-sm font-semibold flex items-center gap-1.5"
           >
             Отправить <ArrowRight size={14} aria-hidden="true" />
           </button>
@@ -122,7 +122,7 @@ export function AiDocsHomeView({
             className="w-full text-left rounded-2xl bg-surface border border-border p-4 flex items-center justify-between"
           >
             <div className="min-w-0">
-              <p className="text-text-primary font-semibold text-[14px] truncate">{lastDoc.title}</p>
+              <p className="text-text-primary font-semibold text-cn-md truncate">{lastDoc.title}</p>
               <p className="text-text-secondary text-[12px] mt-0.5">{formatDate(lastDoc.updated_at)}</p>
             </div>
             <span className="text-text-secondary/40 shrink-0"><ChevronRight size={18} aria-hidden="true" /></span>
@@ -132,7 +132,7 @@ export function AiDocsHomeView({
 
       <button
         onClick={onOpenList}
-        className="w-full py-3 rounded-2xl bg-surface border border-border text-text-primary text-[13.5px] font-semibold"
+        className="w-full py-3 rounded-2xl bg-surface border border-border text-text-primary text-cn-base font-semibold"
       >
         Все документы {total > 0 ? `(${total})` : ""}
       </button>
@@ -147,7 +147,7 @@ function QuickAction({ label, onClick }: { label: string; onClick: () => void })
         haptic("light");
         onClick();
       }}
-      className="rounded-xl bg-surface border border-border py-3 px-3 text-left text-[12.5px] font-semibold text-text-primary"
+      className="rounded-xl bg-surface border border-border py-3 px-3 text-left text-cn-sm font-semibold text-text-primary"
     >
       {label}
     </button>
@@ -157,7 +157,7 @@ function QuickAction({ label, onClick }: { label: string; onClick: () => void })
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl bg-surface border border-border p-3 text-center">
-      <p className="text-text-primary text-[20px] font-semibold" style={{ fontFamily: "inherit" }}>
+      <p className="text-text-primary text-cn-2xl font-semibold" style={{ fontFamily: "inherit" }}>
         {value}
       </p>
       <p className="text-text-secondary text-[10.5px] mt-0.5">{label}</p>

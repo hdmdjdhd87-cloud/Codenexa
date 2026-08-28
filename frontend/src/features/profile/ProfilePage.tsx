@@ -32,7 +32,7 @@ export function ProfilePage() {
   if (user.isLoading) {
     return (
       <div className="px-4 pt-5 pb-6">
-        <h1 className="text-text-primary text-[20px] font-semibold mb-4">{t("profile.title")}</h1>
+        <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("profile.title")}</h1>
         <ProfileHeaderSkeleton />
       </div>
     );
@@ -58,13 +58,13 @@ export function ProfilePage() {
 
   return (
     <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-[20px] font-semibold mb-4">{t("profile.title")}</h1>
+      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("profile.title")}</h1>
 
       {/* HEADER */}
       <div className="flex items-center gap-3.5">
         <Avatar photoUrl={user.data.photo_url} name={fullName} size={64} />
         <div className="min-w-0">
-          <p className="text-text-primary font-semibold text-[17px] truncate">{fullName}</p>
+          <p className="text-text-primary font-semibold text-cn-xl truncate">{fullName}</p>
           {user.data.username && <p className="text-text-secondary text-[13px]">@{user.data.username}</p>}
           <span className="inline-block mt-1.5 text-[10.5px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-accent/15 text-accent">
             CodeNexa Free
@@ -85,12 +85,12 @@ export function ProfilePage() {
       <SectionLabel>Тариф</SectionLabel>
       <div className="rounded-2xl bg-surface border border-border p-4">
         <div className="flex items-center justify-between">
-          <p className="text-text-primary font-semibold text-[14px]">CodeNexa Free</p>
-          <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-warning/15 text-warning">
+          <p className="text-text-primary font-semibold text-cn-md">CodeNexa Free</p>
+          <span className="text-cn-2xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-warning/15 text-warning">
             Demo
           </span>
         </div>
-        <p className="text-text-secondary text-[12.5px] mt-1.5">
+        <p className="text-text-secondary text-cn-sm mt-1.5">
           Тарифы и оплата ещё не подключены — раздел показывает демонстрационные данные, чтобы место в
           интерфейсе было готово к будущей интеграции.
         </p>
@@ -111,25 +111,25 @@ export function ProfilePage() {
         {!confirmingLogout ? (
           <button
             onClick={() => setConfirmingLogout(true)}
-            className="w-full text-left px-4 py-3 text-[13.5px] font-medium text-error"
+            className="w-full text-left px-4 py-3 text-cn-base font-medium text-error"
           >
             Выйти
           </button>
         ) : (
           <div className="px-4 py-3">
-            <p className="text-text-secondary text-[12.5px] mb-2.5">
+            <p className="text-text-secondary text-cn-sm mb-2.5">
               Приложение закроется, при следующем запуске вы авторизуетесь автоматически через Telegram.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={handleLogout}
-                className="flex-1 py-2 rounded-lg bg-error/15 text-error text-[12.5px] font-semibold"
+                className="flex-1 py-2 rounded-lg bg-error/15 text-error text-cn-sm font-semibold"
               >
                 Подтвердить
               </button>
               <button
                 onClick={() => setConfirmingLogout(false)}
-                className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold"
+                className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-cn-sm font-semibold"
               >
                 {t("common.cancel")}
               </button>
@@ -149,7 +149,7 @@ function LimitBar({ label, used, total }: { label: string; used: number; total: 
   const pct = Math.min(100, Math.round((used / total) * 100));
   return (
     <div>
-      <div className="flex items-center justify-between text-[11.5px] mb-1">
+      <div className="flex items-center justify-between text-cn-xs mb-1">
         <span className="text-text-secondary">{label}</span>
         <span className="text-text-secondary">{used} / {total}</span>
       </div>
@@ -171,7 +171,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function LinkRow({ to, label }: { to: string; label: string }) {
   return (
-    <RouterLink to={to} className="flex items-center justify-between px-4 py-3 text-[13.5px] font-medium text-text-primary">
+    <RouterLink to={to} className="flex items-center justify-between px-4 py-3 text-cn-base font-medium text-text-primary">
       <span>{label}</span>
       <span className="text-text-secondary"><ChevronRight size={18} aria-hidden="true" /></span>
     </RouterLink>

@@ -40,20 +40,20 @@ export function CatalogPage() {
 
   return (
     <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-[20px] font-semibold mb-4">{t("catalog.title")}</h1>
+      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("catalog.title")}</h1>
 
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t("catalog.searchPlaceholder")}
-        className="w-full rounded-xl bg-surface border border-border px-4 py-2.5 text-[14px] text-text-primary placeholder:text-text-secondary outline-none focus:border-accent"
+        className="w-full rounded-xl bg-surface border border-border px-4 py-2.5 text-cn-md text-text-primary placeholder:text-text-secondary outline-none focus:border-accent"
       />
 
       {categories.length > 0 && (
         <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-4 px-4">
           <button
             onClick={() => setCategory("all")}
-            className={`shrink-0 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium border ${
+            className={`shrink-0 px-3.5 py-1.5 rounded-full text-cn-sm font-medium border ${
               category === "all" ? "bg-accent text-white border-accent" : "bg-surface text-text-secondary border-border"
             }`}
           >
@@ -63,7 +63,7 @@ export function CatalogPage() {
             <button
               key={c}
               onClick={() => setCategory(c)}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium border ${
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-cn-sm font-medium border ${
                 category === c ? "bg-accent text-white border-accent" : "bg-surface text-text-secondary border-border"
               }`}
             >

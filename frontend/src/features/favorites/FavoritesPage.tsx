@@ -10,7 +10,7 @@ export function FavoritesPage() {
 
   return (
     <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-[20px] font-semibold mb-4">{t("nav.favorites")}</h1>
+      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("nav.favorites")}</h1>
 
       {favorites.isLoading && <LoadingState />}
       {favorites.isError && <ErrorState message={t("errors.loadFavorites")} onRetry={() => favorites.refetch()} />}
@@ -27,8 +27,8 @@ export function FavoritesPage() {
                 {f.name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="text-text-primary font-semibold text-[14px] truncate">{f.name}</p>
-                {f.description && <p className="text-text-secondary text-[12.5px] truncate">{f.description}</p>}
+                <p className="text-text-primary font-semibold text-cn-md truncate">{f.name}</p>
+                {f.description && <p className="text-text-secondary text-cn-sm truncate">{f.description}</p>}
               </div>
             </Link>
           ))}

@@ -11,7 +11,7 @@ export function TemplatesView({ onSelect }: { onSelect: (t: AiDocsTemplate) => v
 
   return (
     <div>
-      <h3 className="text-text-primary text-[14px] font-semibold mb-2.5">Выберите шаблон</h3>
+      <h3 className="text-text-primary text-cn-md font-semibold mb-2.5">Выберите шаблон</h3>
       {templates.isLoading && <ModuleListSkeleton count={4} />}
       {templates.isError && <ErrorState message="Не удалось загрузить шаблоны." onRetry={() => templates.refetch()} />}
       {templates.data && templates.data.length === 0 && <EmptyState title="Шаблонов пока нет" />}
@@ -27,8 +27,8 @@ export function TemplatesView({ onSelect }: { onSelect: (t: AiDocsTemplate) => v
               className="w-full text-left rounded-2xl bg-surface border border-border p-4"
             >
               <div className="flex items-center justify-between">
-                <p className="text-text-primary font-semibold text-[14px]">{tpl.name}</p>
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-accent/15 text-accent">
+                <p className="text-text-primary font-semibold text-cn-md">{tpl.name}</p>
+                <span className="text-cn-2xs font-medium px-1.5 py-0.5 rounded-md bg-accent/15 text-accent">
                   {CATEGORY_LABELS[tpl.category] ?? tpl.category}
                 </span>
               </div>

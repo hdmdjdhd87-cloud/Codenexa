@@ -49,7 +49,7 @@ export function AdminPage() {
   return (
     <div className="px-4 pt-5 pb-6">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-text-primary text-[20px] font-semibold">Админ-панель</h1>
+        <h1 className="text-text-primary text-cn-2xl font-semibold">Админ-панель</h1>
         <span className="text-[11px] text-text-secondary bg-surface-elevated border border-border rounded-full px-2.5 py-1">
           {me.data.role_name}
         </span>
@@ -67,7 +67,7 @@ export function AdminPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 py-2 rounded-lg text-[12.5px] font-semibold transition-colors ${
+            className={`flex-1 py-2 rounded-lg text-cn-sm font-semibold transition-colors ${
               tab === key ? "bg-accent text-white" : "text-text-secondary"
             }`}
           >
@@ -107,7 +107,7 @@ function DashboardTab() {
       {cards.map(([label, value, color]) => (
         <div key={label} className="rounded-xl bg-surface border border-border p-3.5">
           <p className={`text-[22px] font-semibold ${color}`}>{value}</p>
-          <p className="text-text-secondary text-[11.5px] mt-1">{label}</p>
+          <p className="text-text-secondary text-cn-xs mt-1">{label}</p>
         </div>
       ))}
     </div>
@@ -147,7 +147,7 @@ function UsersTab({ permissions }: { permissions: string[] }) {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Поиск по имени, юзернейму или Telegram ID"
-        className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary outline-none focus:border-accent mb-4"
+        className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-cn-base text-text-primary outline-none focus:border-accent mb-4"
       />
 
       {users.isLoading && <LoadingState />}
@@ -166,11 +166,11 @@ function UsersTab({ permissions }: { permissions: string[] }) {
             }`}
           >
             <div className="min-w-0">
-              <p className="text-text-primary text-[13.5px] font-medium truncate">
+              <p className="text-text-primary text-cn-base font-medium truncate">
                 {[u.first_name, u.last_name].filter(Boolean).join(" ") || `ID ${u.telegram_user_id}`}
                 {u.username && <span className="text-text-secondary font-normal"> · @{u.username}</span>}
               </p>
-              <p className="text-text-secondary text-[11.5px] mt-0.5">Telegram ID {u.telegram_user_id}</p>
+              <p className="text-text-secondary text-cn-xs mt-0.5">Telegram ID {u.telegram_user_id}</p>
             </div>
             {u.is_blocked && (
               <span className="shrink-0 text-[10.5px] font-semibold text-error bg-error/10 rounded-full px-2 py-1">
@@ -240,20 +240,20 @@ function UserDetail({
       </button>
 
       <div className="rounded-xl bg-surface border border-border p-4 mb-4">
-        <p className="text-text-primary text-[16px] font-semibold">
+        <p className="text-text-primary text-cn-lg font-semibold">
           {[user.first_name, user.last_name].filter(Boolean).join(" ") || `ID ${user.telegram_user_id}`}
         </p>
         {user.username && <p className="text-text-secondary text-[13px] mt-0.5">@{user.username}</p>}
         <p className="text-text-secondary text-[12px] mt-2">Telegram ID: {user.telegram_user_id}</p>
         <p className="text-text-secondary text-[12px]">Регистрация: {formatDate(user.created_at)}</p>
         {user.is_blocked && (
-          <p className="text-error text-[12.5px] mt-2 font-medium">
+          <p className="text-error text-cn-sm mt-2 font-medium">
             Заблокирован{user.blocked_reason ? `: ${user.blocked_reason}` : ""}
           </p>
         )}
       </div>
 
-      {notice && <p className="text-success text-[12.5px] mb-3">{notice}</p>}
+      {notice && <p className="text-success text-cn-sm mb-3">{notice}</p>}
 
       {canBlock && (
         <div className="mb-3">
@@ -270,13 +270,13 @@ function UserDetail({
                   <button
                     onClick={() => block.mutate(blockReason || "Не указана")}
                     disabled={block.isPending}
-                    className="flex-1 py-2 rounded-lg bg-error/15 text-error text-[12.5px] font-semibold disabled:opacity-60"
+                    className="flex-1 py-2 rounded-lg bg-error/15 text-error text-cn-sm font-semibold disabled:opacity-60"
                   >
                     {block.isPending ? "Блокируем…" : "Подтвердить блокировку"}
                   </button>
                   <button
                     onClick={() => setConfirmingBlock(false)}
-                    className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold"
+                    className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-cn-sm font-semibold"
                   >
                     Отмена
                   </button>
@@ -314,13 +314,13 @@ function UserDetail({
                 <button
                   onClick={() => revoke.mutate()}
                   disabled={revoke.isPending}
-                  className="flex-1 py-2 rounded-lg bg-accent text-white text-[12.5px] font-semibold disabled:opacity-60"
+                  className="flex-1 py-2 rounded-lg bg-accent text-white text-cn-sm font-semibold disabled:opacity-60"
                 >
                   {revoke.isPending ? "Отзываем…" : "Подтвердить"}
                 </button>
                 <button
                   onClick={() => setConfirmingRevoke(false)}
-                  className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-[12.5px] font-semibold"
+                  className="flex-1 py-2 rounded-lg bg-surface-elevated border border-border text-text-primary text-cn-sm font-semibold"
                 >
                   Отмена
                 </button>
@@ -359,7 +359,7 @@ function AuditTab() {
             <p className="text-text-primary text-[13px] font-medium">{ACTION_LABELS[entry.action] ?? entry.action}</p>
             <p className="text-text-secondary text-[11px] shrink-0">{formatDate(entry.created_at)}</p>
           </div>
-          <p className="text-text-secondary text-[11.5px]">
+          <p className="text-text-secondary text-cn-xs">
             {entry.actor_username ? `@${entry.actor_username}` : `ID ${entry.actor_telegram_id ?? "—"}`}
             {entry.reason ? ` · ${entry.reason}` : ""}
           </p>

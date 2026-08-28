@@ -59,7 +59,7 @@ export function DocumentListView({
           haptic("light");
           onCreateClick();
         }}
-        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] mb-2.5"
+        className="w-full py-3.5 rounded-2xl bg-accent text-white font-semibold text-cn-md mb-2.5"
       >
         + Создать документ
       </button>
@@ -90,10 +90,10 @@ export function DocumentListView({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Поиск по названию или тексту"
-        className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-secondary outline-none focus:border-accent mb-4"
+        className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-cn-base text-text-primary placeholder:text-text-secondary outline-none focus:border-accent mb-4"
       />
 
-      <h3 className="text-text-primary text-[14px] font-semibold mb-2.5">Мои документы</h3>
+      <h3 className="text-text-primary text-cn-md font-semibold mb-2.5">Мои документы</h3>
 
       <div className="flex gap-1.5 mb-3">
         {(["all", "recent", "favorites"] as const).map((f) => (
@@ -127,7 +127,7 @@ export function DocumentListView({
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-text-primary font-semibold text-[14px] truncate">{doc.title}</p>
+                  <p className="text-text-primary font-semibold text-cn-md truncate">{doc.title}</p>
                   {doc.is_favorite && <Star size={13} className="text-warning" fill="currentColor" aria-hidden="true" />}
                 </div>
                 <p className="text-text-secondary text-[12px] mt-0.5">
@@ -141,7 +141,7 @@ export function DocumentListView({
             <button
               onClick={() => documents.fetchNextPage()}
               disabled={documents.isFetchingNextPage}
-              className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-secondary text-[12.5px] font-semibold disabled:opacity-60"
+              className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-secondary text-cn-sm font-semibold disabled:opacity-60"
             >
               {documents.isFetchingNextPage ? "Загружаем…" : "Показать ещё"}
             </button>

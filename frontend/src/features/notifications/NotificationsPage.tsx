@@ -10,11 +10,11 @@ export function NotificationsPage() {
   return (
     <div className="px-4 pt-5 pb-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-text-primary text-[20px] font-semibold">{t("notifications.title")}</h1>
+        <h1 className="text-text-primary text-cn-2xl font-semibold">{t("notifications.title")}</h1>
         {notifications.data && notifications.data.some((n) => !n.is_read) && (
           <button
             onClick={() => notifications.markAllRead.mutate()}
-            className="text-[12.5px] font-semibold text-accent"
+            className="text-cn-sm font-semibold text-accent"
           >
             {t("notifications.markAllRead")}
           </button>
@@ -36,8 +36,8 @@ export function NotificationsPage() {
                 n.is_read ? "bg-surface border-border" : "bg-accent/10 border-accent/30"
               }`}
             >
-              <p className="text-text-primary text-[13.5px] font-semibold">{n.title}</p>
-              <p className="text-text-secondary text-[12.5px] mt-0.5">{n.message}</p>
+              <p className="text-text-primary text-cn-base font-semibold">{n.title}</p>
+              <p className="text-text-secondary text-cn-sm mt-0.5">{n.message}</p>
             </button>
           ))}
         </div>

@@ -75,14 +75,14 @@ export function CreateDocumentView({
 
   return (
     <div>
-      <h3 className="text-text-primary text-[16px] font-semibold mb-1">{template.name}</h3>
-      <p className="text-text-secondary text-[12.5px] mb-4">Заполните данные — документ соберётся автоматически.</p>
+      <h3 className="text-text-primary text-cn-lg font-semibold mb-1">{template.name}</h3>
+      <p className="text-text-secondary text-cn-sm mb-4">Заполните данные — документ соберётся автоматически.</p>
 
       {/* Загрузка фото/скана: настоящий OCR (Tesseract), без AI-понимания
           структуры — честно распознаёт текст, пользователь сам переносит
           нужное в поля ниже. */}
       <div className="rounded-xl bg-surface border border-border p-3.5 mb-4">
-        <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-text-secondary text-[12.5px] font-medium cursor-pointer">
+        <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-text-secondary text-cn-sm font-medium cursor-pointer">
           <Camera size={16} aria-hidden="true" /> Загрузить фото/скан для распознавания текста
           <input
             type="file"
@@ -132,20 +132,20 @@ export function CreateDocumentView({
                 value={values[field.key] || ""}
                 onChange={(e) => setField(field.key, e.target.value)}
                 rows={4}
-                className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary outline-none focus:border-accent resize-none"
+                className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-cn-base text-text-primary outline-none focus:border-accent resize-none"
               />
             ) : (
               <input
                 type={field.type === "date" ? "date" : "text"}
                 value={values[field.key] || ""}
                 onChange={(e) => setField(field.key, e.target.value)}
-                className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-[13.5px] text-text-primary outline-none focus:border-accent"
+                className="w-full rounded-xl bg-surface border border-border px-3.5 py-2.5 text-cn-base text-text-primary outline-none focus:border-accent"
               />
             )}
             {suggestedFields[field.key] && suggestedFields[field.key] !== values[field.key] && (
               <button
                 onClick={() => setField(field.key, suggestedFields[field.key])}
-                className="mt-1.5 text-[11.5px] text-accent font-medium"
+                className="mt-1.5 text-cn-xs text-accent font-medium"
               >
                 Использовать из фото: «{suggestedFields[field.key]}»
               </button>
@@ -154,12 +154,12 @@ export function CreateDocumentView({
         ))}
       </div>
 
-      {error && <p className="text-error text-[12.5px] mt-3">{error}</p>}
+      {error && <p className="text-error text-cn-sm mt-3">{error}</p>}
 
       <button
         onClick={handleSubmit}
         disabled={create.isPending}
-        className="w-full mt-5 py-3.5 rounded-2xl bg-accent text-white font-semibold text-[14px] disabled:opacity-60"
+        className="w-full mt-5 py-3.5 rounded-2xl bg-accent text-white font-semibold text-cn-md disabled:opacity-60"
       >
         {create.isPending ? "Создаём…" : "Создать документ"}
       </button>

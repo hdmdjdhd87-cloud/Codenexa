@@ -44,7 +44,7 @@ export function HistoryPage() {
 
   return (
     <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-[20px] font-semibold mb-4">{t("history.title")}</h1>
+      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("history.title")}</h1>
 
       {history.isLoading && <LoadingState />}
       {history.isError && <ErrorState message={t("errors.loadHistory")} onRetry={() => history.refetch()} />}
@@ -62,14 +62,14 @@ export function HistoryPage() {
                 {group.items.map((item) => (
                   <div key={item.id} className="rounded-xl bg-surface border border-border px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-text-primary text-[13.5px] font-medium truncate">
+                      <p className="text-text-primary text-cn-base font-medium truncate">
                         {item.module_name ?? actionLabel(item)}
                       </p>
                       {item.module_name && (
-                        <p className="text-text-secondary text-[11.5px] mt-0.5">{actionLabel(item)}</p>
+                        <p className="text-text-secondary text-cn-xs mt-0.5">{actionLabel(item)}</p>
                       )}
                     </div>
-                    <span className="text-text-secondary text-[11.5px] shrink-0">{timeOnly(item.created_at)}</span>
+                    <span className="text-text-secondary text-cn-xs shrink-0">{timeOnly(item.created_at)}</span>
                   </div>
                 ))}
               </div>

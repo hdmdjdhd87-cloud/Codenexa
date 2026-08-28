@@ -38,7 +38,7 @@ export function AiDocsApp() {
   return (
     <div className="px-4 pt-5 pb-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-text-primary text-[20px] font-semibold">AI Docs</h1>
+        <h1 className="text-text-primary text-cn-2xl font-semibold">AI Docs</h1>
       </div>
 
       {view === "home" && (
