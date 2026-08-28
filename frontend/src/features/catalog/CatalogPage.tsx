@@ -3,6 +3,7 @@ import t from "@/i18n";
 import { useModules } from "@/hooks/useModules";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { PageShell } from "@/components/PageShell";
 import { ModuleListSkeleton } from "@/components/states/Skeleton";
 import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -39,9 +40,7 @@ export function CatalogPage() {
   }
 
   return (
-    <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("catalog.title")}</h1>
-
+    <PageShell title={t("catalog.title")}>
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -85,6 +84,6 @@ export function CatalogPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

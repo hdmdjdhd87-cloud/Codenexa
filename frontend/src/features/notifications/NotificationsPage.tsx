@@ -1,5 +1,6 @@
 import t from "@/i18n";
 import { useNotifications } from "@/hooks/useNotifications";
+import { PageShell } from "@/components/PageShell";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -8,19 +9,17 @@ export function NotificationsPage() {
   const notifications = useNotifications();
 
   return (
-    <div className="px-4 pt-5 pb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-text-primary text-cn-2xl font-semibold">{t("notifications.title")}</h1>
-        {notifications.data && notifications.data.some((n) => !n.is_read) && (
-          <button
-            onClick={() => notifications.markAllRead.mutate()}
-            className="text-cn-sm font-semibold text-accent"
-          >
+    <PageShell
+      title={t("notifications.title")}
+      action={
+        notifications.data &&
+        notifications.data.some((n) => !n.is_read) && (
+          <button onClick={() => notifications.markAllRead.mutate()} className="text-cn-sm font-semibold text-accent">
             {t("notifications.markAllRead")}
           </button>
-        )}
-      </div>
-
+        )
+      }
+    >
       {notifications.isLoading && <LoadingState />}
       {notifications.isError && (
         <ErrorState message={t("errors.loadNotifications")} onRetry={() => notifications.refetch()} />
@@ -42,6 +41,6 @@ export function NotificationsPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

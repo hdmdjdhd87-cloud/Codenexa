@@ -1,5 +1,6 @@
 import t from "@/i18n";
 import { useHistory } from "@/hooks/useHistory";
+import { PageShell } from "@/components/PageShell";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -43,9 +44,7 @@ export function HistoryPage() {
   const history = useHistory();
 
   return (
-    <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("history.title")}</h1>
-
+    <PageShell title={t("history.title")}>
       {history.isLoading && <LoadingState />}
       {history.isError && <ErrorState message={t("errors.loadHistory")} onRetry={() => history.refetch()} />}
       {history.data && history.data.length === 0 && (
@@ -77,6 +76,6 @@ export function HistoryPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

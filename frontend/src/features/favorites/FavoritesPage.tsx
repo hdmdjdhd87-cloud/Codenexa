@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import t from "@/i18n";
 import { useFavorites } from "@/hooks/useFavorites";
+import { PageShell } from "@/components/PageShell";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -9,9 +10,7 @@ export function FavoritesPage() {
   const favorites = useFavorites();
 
   return (
-    <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("nav.favorites")}</h1>
-
+    <PageShell title={t("nav.favorites")}>
       {favorites.isLoading && <LoadingState />}
       {favorites.isError && <ErrorState message={t("errors.loadFavorites")} onRetry={() => favorites.refetch()} />}
       {favorites.data && favorites.data.length === 0 && <EmptyState title={t("empty.favorites")} />}
@@ -34,6 +33,6 @@ export function FavoritesPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

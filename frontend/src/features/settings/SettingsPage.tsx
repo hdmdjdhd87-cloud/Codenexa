@@ -1,6 +1,7 @@
 import { useState } from "react";
 import t from "@/i18n";
 import { useSettings } from "@/hooks/useSettings";
+import { PageShell } from "@/components/PageShell";
 import { LoadingState } from "@/components/states/LoadingState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { haptic } from "@/lib/telegram";
@@ -29,9 +30,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("settings.title")}</h1>
-
+    <PageShell title={t("settings.title")}>
       <SectionLabel>Внешний вид</SectionLabel>
       <div className="rounded-2xl bg-surface border border-border p-3">
         <div className="flex gap-2">
@@ -94,7 +93,7 @@ export function SettingsPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
 
