@@ -8,6 +8,7 @@ import { useModules } from "@/hooks/useModules";
 import { useHistory } from "@/hooks/useHistory";
 import { useQuery } from "@tanstack/react-query";
 import { adminService } from "@/services/adminService";
+import { PageShell } from "@/components/PageShell";
 import { ProfileHeaderSkeleton } from "@/components/states/Skeleton";
 import { ErrorState } from "@/components/states/ErrorState";
 import { Avatar } from "@/components/Avatar";
@@ -31,14 +32,23 @@ export function ProfilePage() {
 
   if (user.isLoading) {
     return (
-      <div className="px-4 pt-5 pb-6">
-        <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("profile.title")}</h1>
+      <PageShell title={t("profile.title")}>
         <ProfileHeaderSkeleton />
-      </div>
+      </PageShell>
     );
   }
   if (user.isError || !user.data) {
-    return <ErrorState message={t("errors.loadProfile")} onRetry={() => user.refetch()} />;
+    // Раньше здесь возвращался голый <ErrorState /> без обёртки —
+    // единственная страница, где ошибка не показывала заголовок
+    // раздела, в отличие от остальных уже отрефакторенных на PageShell
+    // (Catalog/Favorites/History/Settings/Notifications). Приведено к
+    // общему виду — п.18 UI/UX-спецификации требует последовательного
+    // покрытия состояний, не только "успех".
+    return (
+      <PageShell title={t("profile.title")}>
+        <ErrorState message={t("errors.loadProfile")} onRetry={() => user.refetch()} />
+      </PageShell>
+    );
   }
 
   const fullName = [user.data.first_name, user.data.last_name].filter(Boolean).join(" ") || t("home.welcomeFallback");
@@ -57,9 +67,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="px-4 pt-5 pb-6">
-      <h1 className="text-text-primary text-cn-2xl font-semibold mb-4">{t("profile.title")}</h1>
-
+    <PageShell title={t("profile.title")}>
       {/* HEADER */}
       <div className="flex items-center gap-3.5">
         <Avatar photoUrl={user.data.photo_url} name={fullName} size={64} />
@@ -137,7 +145,7 @@ export function ProfilePage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
 

@@ -12,9 +12,19 @@ export function SettingsPage() {
   const settings = useSettings();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
 
-  if (settings.isLoading) return <LoadingState />;
+  if (settings.isLoading) {
+    return (
+      <PageShell title={t("settings.title")}>
+        <LoadingState />
+      </PageShell>
+    );
+  }
   if (settings.isError || !settings.data) {
-    return <ErrorState message={t("errors.loadSettings")} onRetry={() => settings.refetch()} />;
+    return (
+      <PageShell title={t("settings.title")}>
+        <ErrorState message={t("errors.loadSettings")} onRetry={() => settings.refetch()} />
+      </PageShell>
+    );
   }
 
   const s = settings.data;
